@@ -49,7 +49,12 @@ console.log(`   FLASK_ENV=${process.env.FLASK_ENV || 'não definido'}`);
 console.log(`   BACKEND_PORT=${process.env.BACKEND_PORT || 'não definido'}`);
 console.log(`🔍 Executando: ${pythonCmd} backend.py\n`);
 
-const pythonBackend = spawn(pythonCmd, ['backend.py'], {
+// Declara variáveis antes de usar nos handlers
+let backendReady = false;
+let backendStartupLogs = [];
+
+// Usa let para permitir reatribuição se necessário
+let pythonBackend = spawn(pythonCmd, ['backend.py'], {
   cwd: projectDir,
   env: { 
     ...process.env,
@@ -75,7 +80,7 @@ pythonBackend.on('error', (err) => {
     // Tenta python3 se python não funcionar (apenas Linux/Mac)
     if (pythonCmd === 'python' && process.platform !== 'win32') {
       console.log('⚠️  Tentando python3...');
-      const python3Backend = spawn('python3', ['backend.py'], {
+      pythonBackend = spawn('python3', ['backend.py'], {
         cwd: projectDir,
         env: { 
           ...process.env,
@@ -86,31 +91,42 @@ pythonBackend.on('error', (err) => {
         stdio: ['ignore', 'pipe', 'pipe']
       });
       
-      python3Backend.stdout.on('data', (data) => {
+      pythonBackend.stdout.on('data', (data) => {
         const output = data.toString().trim();
         if (output) {
           console.log(`[Python] ${output}`);
+          backendStartupLogs.push(output);
+          if (output.includes('Server running') || output.includes('Starting Noetika') || output.includes('Using Waitress')) {
+            console.log('✅ Backend Python iniciou!');
+            backendReady = true;
+          }
         }
       });
       
-      python3Backend.stderr.on('data', (data) => {
+      pythonBackend.stderr.on('data', (data) => {
         const output = data.toString().trim();
         if (output) {
+          backendStartupLogs.push(`ERR: ${output}`);
           console.error(`[Python ERR] ${output}`);
         }
       });
       
-      python3Backend.on('error', (err2) => {
+      pythonBackend.on('error', (err2) => {
         console.error('❌ python3 também falhou:', err2.message);
         process.exit(1);
       });
       
-      python3Backend.on('spawn', () => {
+      pythonBackend.on('spawn', () => {
         console.log('✅ Processo Python3 spawnado com sucesso!');
+        console.log(`   PID: ${pythonBackend.pid}`);
       });
       
-      // Continua com python3Backend
-      pythonBackend = python3Backend;
+      pythonBackend.on('exit', (code, signal) => {
+        if (code !== 0 && code !== null) {
+          console.error(`❌ Backend Python encerrou com código ${code}${signal ? ` (sinal: ${signal})` : ''}`);
+          process.exit(1);
+        }
+      });
     } else {
       process.exit(1);
     }
@@ -118,9 +134,6 @@ pythonBackend.on('error', (err) => {
     process.exit(1);
   }
 });
-
-let backendReady = false;
-let backendStartupLogs = [];
 
 pythonBackend.stdout.on('data', (data) => {
   const output = data.toString().trim();
