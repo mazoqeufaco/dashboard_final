@@ -758,16 +758,25 @@ if __name__ == '__main__':
     sys.stdout.flush()
     sys.stderr.flush()
     
-    print("=" * 60)
-    print("🐍 Backend Python iniciando...")
-    print("=" * 60)
+    # Log imediato para debug
+    print("", flush=True)
+    print("=" * 60, flush=True)
+    print("🐍 Backend Python iniciando...", flush=True)
+    print("=" * 60, flush=True)
+    print(f"🔍 Python version: {sys.version}", flush=True)
+    print(f"🔍 Working directory: {os.getcwd()}", flush=True)
+    print(f"🔍 Script path: {__file__}", flush=True)
     
     # Porta do backend (sempre 5000 internamente para comunicação com Node.js)
     BACKEND_PORT = int(os.getenv('BACKEND_PORT', 5000))
-    print(f"🔍 BACKEND_PORT = {BACKEND_PORT}")
+    print(f"🔍 BACKEND_PORT = {BACKEND_PORT}", flush=True)
+    print(f"🔍 PORT env var = {os.getenv('PORT', 'não definido')}", flush=True)
+    print(f"🔍 FLASK_ENV = {os.getenv('FLASK_ENV', 'não definido')}", flush=True)
+    print(f"🔍 ENVIRONMENT = {os.getenv('ENVIRONMENT', 'não definido')}", flush=True)
     
     # Verifica se é desenvolvimento ou produção
     is_production = os.getenv('FLASK_ENV') == 'production' or os.getenv('ENVIRONMENT') == 'production' or os.getenv('PORT')
+    print(f"🔍 is_production = {is_production}", flush=True)
     
     if is_production:
         # Produção: usa Waitress (servidor WSGI)
