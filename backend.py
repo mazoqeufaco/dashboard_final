@@ -762,12 +762,26 @@ if __name__ == '__main__':
     
     if is_production:
         # Produção: usa Waitress (servidor WSGI)
-        from waitress import serve
-        print("🚀 Starting Noetika Tracking Backend (PRODUCTION)...")
-        print(f"📊 Server running at http://0.0.0.0:{BACKEND_PORT}")
-        print("💾 Data will be saved to:", DATA_DIR.absolute())
-        print("✅ Using Waitress WSGI server (production-ready)\n")
-        serve(app, host='0.0.0.0', port=BACKEND_PORT, threads=4)
+        try:
+            from waitress import serve
+            print("🚀 Starting Noetika Tracking Backend (PRODUCTION)...")
+            print(f"📊 Server running at http://0.0.0.0:{BACKEND_PORT}")
+            print("💾 Data will be saved to:", DATA_DIR.absolute())
+            print("✅ Using Waitress WSGI server (production-ready)\n")
+            print(f"🔍 Backend PORT environment: {os.getenv('PORT')}")
+            print(f"🔍 Backend BACKEND_PORT environment: {os.getenv('BACKEND_PORT')}")
+            print(f"🔍 Flask ENV: {os.getenv('FLASK_ENV')}")
+            print(f"🔍 Environment: {os.getenv('ENVIRONMENT')}\n")
+            serve(app, host='0.0.0.0', port=BACKEND_PORT, threads=4)
+        except ImportError as e:
+            print(f"❌ Erro ao importar Waitress: {e}")
+            print("💡 Tentando usar servidor Flask de desenvolvimento...")
+            app.run(host='0.0.0.0', port=BACKEND_PORT, debug=False)
+        except Exception as e:
+            print(f"❌ Erro ao iniciar servidor: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
     else:
         # Desenvolvimento: usa servidor embutido do Flask
         print("🚀 Starting Noetika Tracking Backend (DEVELOPMENT)...")

@@ -27,6 +27,11 @@ if (isProduction) {
   process.env.FLASK_ENV = 'production';
   process.env.ENVIRONMENT = 'production';
   process.env.BACKEND_PORT = '5000';
+  console.log('🔧 Variáveis de ambiente configuradas para produção:');
+  console.log(`   FLASK_ENV=${process.env.FLASK_ENV}`);
+  console.log(`   ENVIRONMENT=${process.env.ENVIRONMENT}`);
+  console.log(`   BACKEND_PORT=${process.env.BACKEND_PORT}`);
+  console.log(`   PORT=${process.env.PORT || 'não definido'}\n`);
 }
 
 // Inicia backend Python
