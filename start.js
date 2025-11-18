@@ -43,14 +43,24 @@ const pythonBackend = spawn(pythonCmd, ['backend.py'], {
 });
 
 pythonBackend.stdout.on('data', (data) => {
-  console.log(`[Python] ${data.toString().trim()}`);
+  const output = data.toString().trim();
+  if (output) {
+    console.log(`[Python] ${output}`);
+    // Verifica se o backend iniciou com sucesso
+    if (output.includes('Server running') || output.includes('Starting Noetika')) {
+      console.log('✅ Backend Python iniciado com sucesso!');
+    }
+  }
 });
 
 pythonBackend.stderr.on('data', (data) => {
   const output = data.toString().trim();
-  // Ignora avisos do Flask em produção (já usamos Waitress)
-  if (!output.includes('WARNING: This is a development server')) {
-    console.error(`[Python ERR] ${output}`);
+  if (output) {
+    // Ignora avisos do Flask em produção (já usamos Waitress)
+    if (!output.includes('WARNING: This is a development server') && 
+        !output.includes('DeprecationWarning')) {
+      console.error(`[Python ERR] ${output}`);
+    }
   }
 });
 
@@ -156,7 +166,67 @@ pythonBackend.on('exit', (code) => {
 // Aguarda alguns segundos para o Python iniciar (aumentado para produção)
 const waitTime = isProduction ? 5000 : 3000;
 console.log(`⏳ Aguardando ${waitTime/1000}s para o backend Python iniciar...`);
-setTimeout(() => {
+
+// Função para verificar se o backend está respondendo
+function checkBackendHealth(callback, maxRetries = 5, retryDelay = 1000) {
+  const http = require('http');
+  let retries = 0;
+  
+  function attempt() {
+    const req = http.request({
+      hostname: 'localhost',
+      port: 5000,
+      path: '/api/health',
+      method: 'GET',
+      timeout: 2000
+    }, (res) => {
+      if (res.statusCode === 200) {
+        console.log('✅ Backend Python está respondendo!');
+        callback(true);
+      } else {
+        if (retries < maxRetries) {
+          retries++;
+          console.log(`⏳ Backend ainda não está pronto (tentativa ${retries}/${maxRetries})...`);
+          setTimeout(attempt, retryDelay);
+        } else {
+          console.log('⚠️  Backend não respondeu após várias tentativas, mas continuando...');
+          callback(false);
+        }
+      }
+    });
+    
+    req.on('error', (err) => {
+      if (retries < maxRetries) {
+        retries++;
+        console.log(`⏳ Backend ainda não está pronto (tentativa ${retries}/${maxRetries})...`);
+        setTimeout(attempt, retryDelay);
+      } else {
+        console.log('⚠️  Backend não respondeu após várias tentativas, mas continuando...');
+        callback(false);
+      }
+    });
+    
+    req.on('timeout', () => {
+      req.destroy();
+      if (retries < maxRetries) {
+        retries++;
+        console.log(`⏳ Backend ainda não está pronto (tentativa ${retries}/${maxRetries})...`);
+        setTimeout(attempt, retryDelay);
+      } else {
+        console.log('⚠️  Backend não respondeu após várias tentativas, mas continuando...');
+        callback(false);
+      }
+    });
+    
+    req.end();
+  }
+  
+  // Inicia a primeira tentativa após o tempo de espera inicial
+  setTimeout(attempt, waitTime);
+}
+
+// Verifica saúde do backend antes de iniciar o servidor Node.js
+checkBackendHealth((isHealthy) => {
   console.log('\n📦 Iniciando servidor Node.js...\n');
   
   // Inicia servidor Node.js

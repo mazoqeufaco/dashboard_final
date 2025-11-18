@@ -45,6 +45,16 @@ SESSIONS_CSV = DATA_DIR / 'sessions.csv'
 EVENTS_CSV = DATA_DIR / 'events.csv'
 REPORTS_CSV = DATA_DIR / 'reports.csv'
 
+# Health check endpoint
+@app.route('/api/health', methods=['GET'])
+def health_check():
+    """Health check endpoint to verify backend is running"""
+    return jsonify({
+        'status': 'ok',
+        'service': 'Noetika Tracking Backend',
+        'timestamp': datetime.now().isoformat()
+    }), 200
+
 # Initialize CSV files if they don't exist
 def init_csv_files():
     if not SESSIONS_CSV.exists():

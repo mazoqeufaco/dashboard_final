@@ -61,10 +61,15 @@ function proxyToBackend(req, res) {
 
     proxyReq.on('error', (err) => {
       console.error('❌ Erro ao conectar ao backend Python:', err.message);
+      console.error(`   Tentando conectar em: ${BACKEND_HOST}:${BACKEND_PORT}`);
+      console.error(`   URL da requisição: ${req.url}`);
+      console.error(`   Método: ${req.method}`);
       res.writeHead(502, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ 
         status: 'error', 
-        message: 'Backend Python não está disponível. Os dados serão salvos apenas no localStorage.' 
+        message: 'Backend Python não está disponível. Os dados serão salvos apenas no localStorage.',
+        error: err.message,
+        backend: `${BACKEND_HOST}:${BACKEND_PORT}`
       }));
     });
 
