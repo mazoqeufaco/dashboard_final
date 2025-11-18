@@ -1075,7 +1075,15 @@ async function generateReport() {
     window.URL.revokeObjectURL(url);
   } catch (err) {
     console.error('Erro ao gerar relatório:', err);
-    alert('Erro ao gerar relatório. Verifique o console para mais detalhes.');
+    
+    // Se for erro 502 (Bad Gateway), o backend não está disponível
+    if (err.message && err.message.includes('502')) {
+      alert('Backend não está disponível. A geração de relatório requer o servidor backend em execução.\n\n' +
+            'Em produção, certifique-se de que o backend Python está rodando corretamente.');
+    } else {
+      alert('Erro ao gerar relatório. Verifique o console para mais detalhes.\n\n' +
+            'Erro: ' + err.message);
+    }
   }
 }
 

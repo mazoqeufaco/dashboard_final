@@ -35,7 +35,10 @@ console.log('🐍 Iniciando backend Python...');
 const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
 const pythonBackend = spawn(pythonCmd, ['backend.py'], {
   cwd: projectDir,
-  env: { ...process.env },
+  env: { 
+    ...process.env,
+    PYTHONUNBUFFERED: '1' // Garante que o output do Python apareça imediatamente
+  },
   stdio: ['ignore', 'pipe', 'pipe']
 });
 
@@ -88,6 +91,8 @@ pythonBackend.on('error', (err) => {
       });
       
       // Continua com python3Backend ao invés de pythonBackend
+      const waitTime3 = isProduction ? 5000 : 3000;
+      console.log(`⏳ Aguardando ${waitTime3/1000}s para o backend Python iniciar...`);
       setTimeout(() => {
         console.log('\n📦 Iniciando servidor Node.js...\n');
         
@@ -124,7 +129,7 @@ pythonBackend.on('error', (err) => {
           python3Backend.kill();
           process.exit(0);
         });
-      }, 3000);
+      }, waitTime3);
       
       return; // Sai da função para não continuar com o pythonBackend original
     } else {
@@ -148,7 +153,9 @@ pythonBackend.on('exit', (code) => {
   }
 });
 
-// Aguarda alguns segundos para o Python iniciar
+// Aguarda alguns segundos para o Python iniciar (aumentado para produção)
+const waitTime = isProduction ? 5000 : 3000;
+console.log(`⏳ Aguardando ${waitTime/1000}s para o backend Python iniciar...`);
 setTimeout(() => {
   console.log('\n📦 Iniciando servidor Node.js...\n');
   
