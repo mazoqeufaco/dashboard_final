@@ -54,6 +54,33 @@ let backendReady = false;
 let backendStartupLogs = [];
 
 // Usa let para permitir reatribuição se necessário
+console.log(`🔍 Spawnando processo Python: ${pythonCmd} backend.py`);
+console.log(`🔍 Diretório: ${projectDir}`);
+console.log(`🔍 Python path: ${pythonCmd}`);
+
+// Testa se o Python está disponível
+const { execSync } = require('child_process');
+try {
+  const pythonVersion = execSync(`${pythonCmd} --version`, { encoding: 'utf-8', timeout: 2000 });
+  console.log(`✅ Python encontrado: ${pythonVersion.trim()}`);
+} catch (err) {
+  console.error(`❌ Python não encontrado ou não acessível: ${err.message}`);
+  if (pythonCmd === 'python' && process.platform !== 'win32') {
+    console.log('⚠️  Tentando python3...');
+    try {
+      const python3Version = execSync('python3 --version', { encoding: 'utf-8', timeout: 2000 });
+      console.log(`✅ Python3 encontrado: ${python3Version.trim()}`);
+      pythonCmd = 'python3';
+    } catch (err2) {
+      console.error(`❌ Python3 também não encontrado: ${err2.message}`);
+      console.error('💡 Verifique se Python está instalado no sistema.');
+      process.exit(1);
+    }
+  } else {
+    process.exit(1);
+  }
+}
+
 let pythonBackend = spawn(pythonCmd, ['backend.py'], {
   cwd: projectDir,
   env: { 
@@ -64,6 +91,9 @@ let pythonBackend = spawn(pythonCmd, ['backend.py'], {
   },
   stdio: ['ignore', 'pipe', 'pipe']
 });
+
+console.log(`🔍 Processo spawnado, aguardando eventos...`);
+console.log(`🔍 PID do processo: ${pythonBackend.pid || 'ainda não atribuído'}`);
 
 pythonBackend.on('spawn', () => {
   console.log('✅ Processo Python spawnado com sucesso!');
