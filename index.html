@@ -7,12 +7,11 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div class="main-content">
-    <h1 class="main-title">Tribússola - um norte para sua solução</h1>
-    <h2 class="subtitle">dashboard interativo</h2>
-    <p>Clique sobre o triângulo para definir sua prioridade</p>
+  <h1>Tribússola - um norte para sua solução</h1>
+  <h2>Desafio SEG Automotive - DIP prof Ugo Ibusuki UFABC SBC 2025-3</h2>
+  <p>Clique sobre o triângulo para definir sua prioridade</p>
 
-    <div class="wrap">
+  <div class="wrap">
     <div class="tri-wrap">
       <canvas id="tri" width="900" height="620"></canvas>
       <!-- Rótulos externos -->
@@ -51,17 +50,15 @@
     <div class="result" id="rankingSection" style="display:none">
       <h2>Ranking</h2>
       <div id="table"></div>
-      <div id="clusterPlot"></div>
       <div class="result-actions">
-        <button id="btnGenerateReport" class="ghost">Gerar relatório</button>
-        <button id="btnTree" class="ghost">Árvore de Soluções</button>
-      </div>
-      <!-- Árvore aparece abaixo do gráfico quando clicar no botão -->
-      <div class="tree" id="treeSection" style="display:none">
-        <h2>Árvore de Soluções - clique para explorar</h2>
-        <div id="tree"></div>
+        <button id="btnTree" class="ghost">Todas soluções</button>
       </div>
     </div>
+
+    <!-- Árvore (inicia oculto) -->
+    <div class="tree" id="treeSection" style="display:none">
+      <h2>Árvore de soluções</h2>
+      <div id="tree"></div>
     </div>
   </div>
 
@@ -76,63 +73,6 @@
     </div>
   </dialog>
 
-  <!-- Modal de Informações da Solução -->
-  <dialog id="solutionModal">
-    <div class="modal-header">
-      <h2>Detalhes da Solução</h2>
-      <button id="closeModal" class="modal-close" aria-label="Fechar">×</button>
-    </div>
-    <div id="solutionModalContent" class="modal-content"></div>
-  </dialog>
-
-  <!-- Modal de Confirmação de Relatório -->
-  <dialog id="reportConfirmDlg">
-    <div class="dlg-content">
-      <p><strong>Transparência sobre consultoria e dados</strong><br><br>
-      Este material possui caráter consultivo (diagnóstico e recomendações com base nos dados fornecidos). Processamos dados como IP, timestamp e métricas de navegação para: (1) gerar e disponibilizar o PDF/relatório, (2) registrar sua ciência e manter trilha de auditoria, e (3) viabilizar contato comercial para eventual proposta. Base legal: procedimentos pré-contratuais/contratuais e legítimo interesse, além do consentimento quando aplicável. Direitos do titular: acesso, correção, oposição e eliminação contate noetikaai@gmail.com</p>
-      <div class="dlg-actions">
-        <button id="reportConfirmOk" class="primary">Ok</button>
-        <button id="reportConfirmCancel">Cancelar</button>
-      </div>
-    </div>
-  </dialog>
-
-  <!-- Footer -->
-  <footer class="site-footer">
-    <p class="footer-header-text">um projeto motivado pelo Desafio SEG Automotive - DIP prof Ugo Ibusuki UFABC SBC 2025-3</p>
-    <div class="footer-logo">
-      <img src="logo%20Noetika%20AI%202.png" alt="NOETIKA AI" class="footer-logo-image" />
-    </div>
-    <p class="footer-text">Powered by Noetika AI - Gabriel R A S - 2025 - all rights reserved</p>
-  </footer>
-
-  <!-- D3.js v3 - usando CDN alternativo (jsDelivr) para evitar bloqueios -->
-  <script src="https://cdn.jsdelivr.net/npm/d3@3/d3.min.js"></script>
-  <script>
-    // Garante que d3 está disponível globalmente
-    (function() {
-      if(typeof d3 !== 'undefined'){
-        window.d3 = d3;
-        console.log('✅ D3.js carregado:', typeof d3);
-      } else {
-        console.error('❌ D3.js não foi carregado! Tentando CDN alternativo...');
-        // Fallback: tenta carregar do CDN oficial
-        const script = document.createElement('script');
-        script.src = 'https://d3js.org/d3.v3.min.js';
-        script.onload = function() {
-          if(typeof d3 !== 'undefined'){
-            window.d3 = d3;
-            console.log('✅ D3.js carregado do CDN oficial');
-          }
-        };
-        script.onerror = function() {
-          console.error('❌ Falha ao carregar D3.js de ambos os CDNs!');
-        };
-        document.head.appendChild(script);
-      }
-    })();
-  </script>
-  <script src="tracking.js"></script>
   <script type="module" src="app.js"></script>
 </body>
 </html>
