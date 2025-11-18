@@ -47,13 +47,18 @@ const pythonBackend = spawn(pythonCmd, ['backend.py'], {
   stdio: ['ignore', 'pipe', 'pipe']
 });
 
+let backendReady = false;
+let backendStartupLogs = [];
+
 pythonBackend.stdout.on('data', (data) => {
   const output = data.toString().trim();
   if (output) {
     console.log(`[Python] ${output}`);
+    backendStartupLogs.push(output);
     // Verifica se o backend iniciou com sucesso
-    if (output.includes('Server running') || output.includes('Starting Noetika')) {
-      console.log('✅ Backend Python iniciado com sucesso!');
+    if (output.includes('Server running') || output.includes('Starting Noetika') || output.includes('Using Waitress')) {
+      console.log('✅ Backend Python iniciou!');
+      backendReady = true;
     }
   }
 });
@@ -61,9 +66,11 @@ pythonBackend.stdout.on('data', (data) => {
 pythonBackend.stderr.on('data', (data) => {
   const output = data.toString().trim();
   if (output) {
+    backendStartupLogs.push(`ERR: ${output}`);
     // Ignora avisos do Flask em produção (já usamos Waitress)
     if (!output.includes('WARNING: This is a development server') && 
-        !output.includes('DeprecationWarning')) {
+        !output.includes('DeprecationWarning') &&
+        !output.includes('Deprecation')) {
       console.error(`[Python ERR] ${output}`);
     }
   }
@@ -161,10 +168,15 @@ pythonBackend.on('error', (err) => {
   }
 });
 
-pythonBackend.on('exit', (code) => {
+pythonBackend.on('exit', (code, signal) => {
   if (code !== 0 && code !== null) {
-    console.error(`❌ Backend Python encerrou com código ${code}`);
+    console.error(`❌ Backend Python encerrou com código ${code}${signal ? ` (sinal: ${signal})` : ''}`);
+    console.error('💡 Últimos logs do backend:');
+    backendStartupLogs.slice(-10).forEach(log => console.error(`   ${log}`));
+    console.error('💡 Verifique os logs acima para identificar o problema');
     process.exit(1);
+  } else if (signal) {
+    console.log(`⚠️  Backend Python recebeu sinal ${signal}`);
   }
 });
 
@@ -227,11 +239,26 @@ function checkBackendHealth(callback, maxRetries = 5, retryDelay = 1000) {
   }
   
   // Inicia a primeira tentativa após o tempo de espera inicial
-  setTimeout(attempt, waitTime);
+  // Mas primeiro verifica se o backend já está pronto pelos logs
+  setTimeout(() => {
+    if (backendReady) {
+      console.log('✅ Backend Python já está pronto (detectado pelos logs)!');
+      callback(true);
+    } else {
+      console.log('⏳ Verificando saúde do backend (não detectado nos logs ainda)...');
+      attempt();
+    }
+  }, waitTime);
 }
 
 // Verifica saúde do backend antes de iniciar o servidor Node.js
 checkBackendHealth((isHealthy) => {
+  if (!isHealthy) {
+    console.error('❌ Backend Python não está respondendo!');
+    console.error('💡 Últimos logs do backend:');
+    backendStartupLogs.slice(-10).forEach(log => console.error(`   ${log}`));
+    console.error('⚠️  Iniciando servidor Node.js mesmo assim, mas o backend pode não estar funcionando...\n');
+  }
   console.log('\n📦 Iniciando servidor Node.js...\n');
   
   // Inicia servidor Node.js

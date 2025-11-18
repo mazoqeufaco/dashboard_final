@@ -754,8 +754,17 @@ Este email contém o relatório PDF em anexo.
 if __name__ == '__main__':
     import sys
     
+    # Força flush imediato de output
+    sys.stdout.flush()
+    sys.stderr.flush()
+    
+    print("=" * 60)
+    print("🐍 Backend Python iniciando...")
+    print("=" * 60)
+    
     # Porta do backend (sempre 5000 internamente para comunicação com Node.js)
     BACKEND_PORT = int(os.getenv('BACKEND_PORT', 5000))
+    print(f"🔍 BACKEND_PORT = {BACKEND_PORT}")
     
     # Verifica se é desenvolvimento ou produção
     is_production = os.getenv('FLASK_ENV') == 'production' or os.getenv('ENVIRONMENT') == 'production' or os.getenv('PORT')
