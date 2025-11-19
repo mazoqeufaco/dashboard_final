@@ -24,19 +24,31 @@ function rgbToBary([r,g,b], map){ const val={'R':r,'G':g,'B':b}; return [val[map
 
 function detectVerticesByAlpha(img,w,h){
   const off=document.createElement('canvas'); off.width=w; off.height=h;
-  const octx=off.getContext('2d'); octx.drawImage(img,0,0,w,h);
-  const {data}=octx.getImageData(0,0,w,h);
-  const pts=[]; const TH=30; // Threshold menor para capturar mais pixels
+  const octx=off.getContext('2d'); 
+  octx.drawImage(img,0,0,w,h);
   
-  // Procura em toda a área da imagem
-  for(let y=0;y<h;y++) {
-    for(let x=0;x<w;x++){
-      const alpha = data[(y*w+x)*4+3];
-      if(alpha>=TH) pts.push({x,y});
+  let data, pts=[], TH=30;
+  
+  try {
+    // Tenta obter dados da imagem
+    const imageData = octx.getImageData(0,0,w,h);
+    data = imageData.data;
+    
+    // Procura em toda a área da imagem
+    for(let y=0;y<h;y++) {
+      for(let x=0;x<w;x++){
+        const alpha = data[(y*w+x)*4+3];
+        if(alpha>=TH) pts.push({x,y});
+      }
     }
+  } catch(err) {
+    // Se getImageData falhar (CORS/tainted canvas no Chrome), usa fallback geométrico
+    console.warn('getImageData falhou, usando detecção geométrica:', err);
+    // Retorna vértices baseados na geometria esperada do triângulo
+    return {top:{x:Math.floor(w/2),y:0},left:{x:0,y:h-1},right:{x:w-1,y:h-1}};
   }
   
-  if(!pts.length) return {top:{x:w/2,y:0},left:{x:0,y:h-1},right:{x:w-1,y:h-1}};
+  if(!pts.length) return {top:{x:Math.floor(w/2),y:0},left:{x:0,y:h-1},right:{x:w-1,y:h-1}};
   
   const extreme=(key,min=true,band=3)=>{
     if(!pts || pts.length === 0) {
@@ -89,8 +101,31 @@ export async function initEntrada(opts={}){
   const dlgOk=document.querySelector(cfg.ui.confirmOkSel);
   const dlgReset=document.querySelector(cfg.ui.confirmResetSel);
 
-  const img=new Image();
-  await new Promise((res,rej)=>{ img.onload=res; img.onerror=rej; img.src=cfg.imgSrc; });
+  let img=new Image();
+  // Tenta carregar com CORS para permitir getImageData no Chrome
+  // Se o servidor não suportar CORS, tenta sem CORS (fallback geométrico será usado se getImageData falhar)
+  img.crossOrigin='anonymous';
+  await new Promise((res,rej)=>{ 
+    let triedWithoutCors = false;
+    img.onload=res; 
+    img.onerror=(e)=>{ 
+      // Se falhar com CORS, tenta sem CORS (para servidores locais sem CORS)
+      if(!triedWithoutCors) {
+        triedWithoutCors = true;
+        img = new Image(); // Nova instância sem CORS
+        img.onload = res;
+        img.onerror = (e2) => {
+          console.error('Erro ao carregar imagem:', cfg.imgSrc, e2);
+          rej(e2);
+        };
+        img.src = cfg.imgSrc;
+      } else {
+        console.error('Erro ao carregar imagem:', cfg.imgSrc, e);
+        rej(e);
+      }
+    }; 
+    img.src=cfg.imgSrc; 
+  });
 
   const padTop=30,padBottom=30; // Padding equilibrado
   const maxW=canvas.width-40, maxH=canvas.height-padTop-padBottom;
