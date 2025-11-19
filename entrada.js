@@ -32,18 +32,29 @@ function detectVerticesByAlpha(img,w,h){
   try {
     // Tenta obter dados da imagem
     const imageData = octx.getImageData(0,0,w,h);
+    if(!imageData || !imageData.data || imageData.data.length === 0) {
+      throw new Error('getImageData retornou dados inválidos');
+    }
     data = imageData.data;
+    
+    // Verifica se o tamanho dos dados está correto
+    const expectedLength = w * h * 4;
+    if(data.length !== expectedLength) {
+      throw new Error(`Tamanho de dados incorreto: esperado ${expectedLength}, obtido ${data.length}`);
+    }
     
     // Procura em toda a área da imagem
     for(let y=0;y<h;y++) {
       for(let x=0;x<w;x++){
-        const alpha = data[(y*w+x)*4+3];
-        if(alpha>=TH) pts.push({x,y});
+        const idx = (y*w+x)*4+3;
+        if(idx >= data.length) break;
+        const alpha = data[idx];
+        if(!isNaN(alpha) && alpha>=TH) pts.push({x,y});
       }
     }
   } catch(err) {
     // Se getImageData falhar (CORS/tainted canvas no Chrome), usa fallback geométrico
-    console.warn('getImageData falhou, usando detecção geométrica:', err);
+    console.warn('getImageData falhou, usando detecção geométrica:', err.message || err);
     // Retorna vértices baseados na geometria esperada do triângulo
     return {top:{x:Math.floor(w/2),y:0},left:{x:0,y:h-1},right:{x:w-1,y:h-1}};
   }
@@ -51,32 +62,76 @@ function detectVerticesByAlpha(img,w,h){
   if(!pts.length) return {top:{x:Math.floor(w/2),y:0},left:{x:0,y:h-1},right:{x:w-1,y:h-1}};
   
   const extreme=(key,min=true,band=3)=>{
-    if(!pts || pts.length === 0) {
-      // Fallback se não houver pontos
-      if(key==='y') return {x:w/2,y:0};
-      if(key==='x' && min) return {x:0,y:h-1};
-      return {x:w-1,y:h-1};
+    // Fallback seguro se não houver pontos
+    const fallback = key==='y' 
+      ? {x:Math.floor(w/2),y:0}
+      : (min ? {x:0,y:h-1} : {x:w-1,y:h-1});
+    
+    if(!pts || pts.length === 0) return fallback;
+    
+    // Filtra pontos válidos
+    const validPts = pts.filter(p=>p && typeof p === 'object' && !isNaN(p[key]) && p[key] !== null && p[key] !== undefined);
+    if(validPts.length === 0) return fallback;
+    
+    // Encontra o valor extremo
+    let ex = validPts[0][key];
+    for(let i=1; i<validPts.length; i++) {
+      const val = validPts[i][key];
+      if(min ? val < ex : val > ex) ex = val;
     }
-    const vs=pts.map(p=>p[key]); 
-    if(vs.length === 0) {
-      if(key==='y') return {x:w/2,y:0};
-      if(key==='x' && min) return {x:0,y:h-1};
-      return {x:w-1,y:h-1};
-    }
-    const ex=min?Math.min(...vs):Math.max(...vs);
-    const sel=pts.filter(p=>Math.abs(p[key]-ex)<=band);
+    
+    if(isNaN(ex)) return fallback;
+    
+    // Filtra pontos próximos ao extremo
+    const sel = validPts.filter(p=>Math.abs(p[key]-ex)<=band);
+    
     if(sel.length === 0) {
       // Se nenhum ponto na banda, retorna o mais próximo do extremo
-      const closest = pts.reduce((b,p)=>Math.abs(p[key]-ex)<Math.abs(b[key]-ex)?p:b,pts[0]);
+      let closest = validPts[0];
+      let minDist = Math.abs(closest[key]-ex);
+      for(let i=1; i<validPts.length; i++) {
+        const dist = Math.abs(validPts[i][key]-ex);
+        if(dist < minDist) {
+          minDist = dist;
+          closest = validPts[i];
+        }
+      }
       return closest;
     }
+    
+    // Para o topo (y), encontra o ponto mais central em x
     if(key==='y'){ 
-      const cx=sel.reduce((s,p)=>s+p.x,0)/sel.length;
-      return sel.reduce((b,p)=>Math.abs(p.x-cx)<Math.abs(b.x-cx)?p:b,sel[0]); 
+      let sumX = 0;
+      for(let i=0; i<sel.length; i++) sumX += sel[i].x;
+      const cx = sumX / sel.length;
+      if(isNaN(cx)) return fallback;
+      
+      let closest = sel[0];
+      let minDist = Math.abs(closest.x-cx);
+      for(let i=1; i<sel.length; i++) {
+        const dist = Math.abs(sel[i].x-cx);
+        if(dist < minDist) {
+          minDist = dist;
+          closest = sel[i];
+        }
+      }
+      return closest;
     }
-    return sel.reduce((b,p)=>p.y>b.y?p:b,sel[0]);
+    
+    // Para esquerda/direita (x), encontra o ponto mais baixo em y
+    let lowest = sel[0];
+    for(let i=1; i<sel.length; i++) {
+      if(sel[i].y > lowest.y) lowest = sel[i];
+    }
+    return lowest;
   };
-  return { top:extreme('y',true), left:extreme('x',true), right:extreme('x',false) };
+  
+  try {
+    return { top:extreme('y',true), left:extreme('x',true), right:extreme('x',false) };
+  } catch(err) {
+    console.warn('Erro ao detectar vértices, usando fallback geométrico:', err);
+    return {top:{x:Math.floor(w/2),y:0},left:{x:0,y:h-1},right:{x:w-1,y:h-1}};
+  }
 }
 
 function drawScene(ctx, canvas, img, rect, point){
@@ -136,7 +191,27 @@ export async function initEntrada(opts={}){
   const y=padTop + Math.floor((canvas.height - padTop - padBottom - h) * 0.5);
   const rect={x,y,w,h};
 
-  const v=detectVerticesByAlpha(img,w,h);
+  // Tenta detectar vértices, com fallback seguro
+  let v;
+  try {
+    v = detectVerticesByAlpha(img,w,h);
+    // Valida os vértices retornados
+    if(!v || !v.top || !v.left || !v.right || 
+       isNaN(v.top.x) || isNaN(v.top.y) ||
+       isNaN(v.left.x) || isNaN(v.left.y) ||
+       isNaN(v.right.x) || isNaN(v.right.y)) {
+      throw new Error('Vértices inválidos retornados');
+    }
+  } catch(err) {
+    console.warn('Erro ao detectar vértices, usando fallback geométrico:', err.message || err);
+    // Fallback geométrico seguro
+    v = {
+      top: {x: Math.floor(w/2), y: 0},
+      left: {x: 0, y: h-1},
+      right: {x: w-1, y: h-1}
+    };
+  }
+  
   const Vtop={x:x+v.top.x,y:y+v.top.y};
   const Vleft={x:x+v.left.x,y:y+v.left.y};
   const Vright={x:x+v.right.x,y:y+v.right.y};
