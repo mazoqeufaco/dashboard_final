@@ -296,14 +296,15 @@ dialog::backdrop {
   z-index: 9998;
 }
 .dlg-content{ padding:20px; }
-.dlg-content p{ line-height:1.5; margin-top:0; white-space:pre-line; }
+.dlg-content h3 { text-align: center; margin-top: 0; }
+.dlg-content p{ line-height:1.5; margin-top:0; white-space:pre-line; text-align: center; }
 .dlg-actions{ 
   display: -webkit-box;
   display: -ms-flexbox;
   display: flex; 
-  -webkit-box-pack: end;
-  -ms-flex-pack: end;
-  justify-content: flex-end; 
+  -webkit-box-pack: center;
+  -ms-flex-pack: center;
+  justify-content: center; 
   gap: 10px; 
   margin-top: 6px; 
 }
