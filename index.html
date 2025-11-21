@@ -54,14 +54,36 @@
 
       <div id="treeSection" style="display: none;">
         <div id="tree" class="tree"></div>
+
+        <div class="tree-legend"
+          style="margin-top: 20px; padding: 15px; background: #1a1a1a; border-radius: 8px; border: 1px solid #333;">
+          <h4 style="margin: 0 0 10px 0; color: #eaeaea; font-size: 14px;">Legenda:</h4>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span
+                style="width: 16px; height: 16px; background-color: #ff4d4d; border-radius: 4px; display: inline-block;"></span>
+              <span style="color: #ccc; font-size: 13px;">confia? essas empresas terão dados da SEG</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span
+                style="width: 16px; height: 16px; background-color: #4d94ff; border-radius: 4px; display: inline-block;"></span>
+              <span style="color: #ccc; font-size: 13px;">plataformas com login a partir de qualquer lugar, e em
+                qualquer horário</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span
+                style="width: 16px; height: 16px; background-color: #ff9900; border-radius: 4px; display: inline-block;"></span>
+              <span style="color: #ccc; font-size: 13px;">pode demandar instalação de novos terminais</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 
   <dialog id="confirmDlg">
     <div class="dlg-content">
-      <h3>Confirmar Prioridades</h3>
-      <p id="dlgText"></p>
+      <p id="dlgText" style="text-align: center;"></p>
       <div class="dlg-actions">
         <button id="dlgReset" class="ghost">Cancelar</button>
         <button id="dlgOk" class="primary">Confirmar</button>
