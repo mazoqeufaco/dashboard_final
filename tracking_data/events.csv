@@ -5378,3 +5378,40 @@ session_1763733374402_ygryjuhkq,button_click,2025-11-21T18:29:44.129Z,ranking,"{
 session_1763733374402_ygryjuhkq,button_click,2025-11-21T18:29:45.316Z,tree,"{""text"": ""\u00c1rvore de Solu\u00e7\u00f5es"", ""id"": ""btnTree"", ""classes"": ""ghost""}"
 session_1763733374402_ygryjuhkq,session_end,2025-11-21T18:29:47.188Z,tree,"{""totalDuration"": 7, ""totalEvents"": 65}"
 session_1763733374402_ygryjuhkq,time_update,2025-11-21T18:29:47.186Z,tree,"{""timeOnPage"": 7, ""totalTime"": 7}"
+session_1763733374402_ygryjuhkq,page_view,2025-11-21T19:59:58.963Z,podium,"{""page"": ""input""}"
+session_1763733374402_ygryjuhkq,page_visible,2025-11-21T19:59:59.215Z,podium,{}
+session_1763733374402_ygryjuhkq,time_update,2025-11-21T20:00:02.021Z,podium,"{""timeOnPage"": 3, ""totalTime"": 3}"
+session_1763733374402_ygryjuhkq,page_hidden,2025-11-21T20:00:02.021Z,podium,{}
+session_1763733374402_ygryjuhkq,page_visible,2025-11-21T20:00:18.914Z,podium,{}
+session_1763733374402_ygryjuhkq,triangle_interaction,2025-11-21T20:00:20.218Z,podium,"{""element"": ""canvas""}"
+session_1763733374402_ygryjuhkq,triangle_interaction,2025-11-21T20:00:21.509Z,podium,"{""element"": ""canvas""}"
+session_1763733374402_ygryjuhkq,triangle_interaction,2025-11-21T20:00:21.634Z,podium,"{""element"": ""canvas""}"
+session_1763733374402_ygryjuhkq,triangle_interaction,2025-11-21T20:00:22.042Z,podium,"{""element"": ""canvas""}"
+session_1763733374402_ygryjuhkq,triangle_interaction,2025-11-21T20:00:22.342Z,podium,"{""element"": ""canvas""}"
+session_1763733374402_ygryjuhkq,button_click,2025-11-21T20:00:23.229Z,podium,"{""text"": ""Confirma"", ""id"": ""confirm"", ""classes"": ""primary""}"
+session_1763733374402_ygryjuhkq,button_click,2025-11-21T20:00:24.041Z,podium,"{""text"": ""Ok"", ""id"": ""dlgOk"", ""classes"": ""primary""}"
+session_1763733374402_ygryjuhkq,button_click,2025-11-21T20:00:25.038Z,ranking,"{""text"": ""Ranking completo"", ""id"": ""btnRanking"", ""classes"": ""ghost""}"
+session_1763733374402_ygryjuhkq,scroll_depth,2025-11-21T20:00:25.713Z,ranking,"{""depth"": 100}"
+session_1763733374402_ygryjuhkq,button_click,2025-11-21T20:00:26.683Z,ranking,"{""text"": ""Gerar relat\u00f3rio"", ""id"": ""btnGenerateReport"", ""classes"": ""ghost""}"
+session_1763733374402_ygryjuhkq,button_click,2025-11-21T20:00:27.704Z,ranking,"{""text"": ""Ok"", ""id"": ""reportConfirmOk"", ""classes"": ""primary""}"
+session_1763733374402_ygryjuhkq,time_update,2025-11-21T20:00:28.964Z,ranking,"{""timeOnPage"": 10, ""totalTime"": 13}"
+session_1763733374402_ygryjuhkq,location_updated,2025-11-21T20:00:29.005Z,ranking,"{""ip"": ""127.0.0.1"", ""location"": {""city"": """", ""region"": """", ""country"": """", ""country_code"": """", ""latitude"": """", ""longitude"": """", ""timezone"": """"}}"
+session_1763733374402_ygryjuhkq,time_update,2025-11-21T20:00:29.078Z,ranking,"{""timeOnPage"": 0, ""totalTime"": 13}"
+session_1763733374402_ygryjuhkq,session_end,2025-11-21T20:00:29.080Z,ranking,"{""totalDuration"": 13, ""totalEvents"": 84}"
+session_1763733374402_ygryjuhkq,time_update,2025-11-21T20:00:29.211Z,ranking,"{""timeOnPage"": 0, ""totalTime"": 13}"
+session_1763733374402_ygryjuhkq,page_hidden,2025-11-21T20:00:29.211Z,ranking,{}
+session_1763733374402_ygryjuhkq,page_view,2025-11-21T20:03:46.703Z,podium,"{""page"": ""input""}"
+session_1763733374402_ygryjuhkq,page_view,2025-11-21T20:03:48.439Z,podium,"{""page"": ""input""}"
+session_1763733374402_ygryjuhkq,page_visible,2025-11-21T20:03:50.438Z,podium,{}
+session_1763733374402_ygryjuhkq,triangle_interaction,2025-11-21T20:03:51.883Z,podium,"{""element"": ""canvas""}"
+session_1763733374402_ygryjuhkq,scroll_depth,2025-11-21T20:03:52.269Z,podium,"{""depth"": 100}"
+session_1763733374402_ygryjuhkq,button_click,2025-11-21T20:03:53.092Z,podium,"{""text"": ""Confirma"", ""id"": ""confirm"", ""classes"": ""primary""}"
+session_1763733374402_ygryjuhkq,button_click,2025-11-21T20:03:53.855Z,podium,"{""text"": ""Ok"", ""id"": ""dlgOk"", ""classes"": ""primary""}"
+session_1763733374402_ygryjuhkq,button_click,2025-11-21T20:03:54.484Z,ranking,"{""text"": ""Ranking completo"", ""id"": ""btnRanking"", ""classes"": ""ghost""}"
+session_1763733374402_ygryjuhkq,button_click,2025-11-21T20:03:56.820Z,ranking,"{""text"": ""Gerar relat\u00f3rio"", ""id"": ""btnGenerateReport"", ""classes"": ""ghost""}"
+session_1763733374402_ygryjuhkq,button_click,2025-11-21T20:03:59.842Z,ranking,"{""text"": ""Ok"", ""id"": ""reportConfirmOk"", ""classes"": ""primary""}"
+session_1763733374402_ygryjuhkq,time_update,2025-11-21T20:04:18.441Z,ranking,"{""timeOnPage"": 28, ""totalTime"": 28}"
+session_1763733374402_ygryjuhkq,location_updated,2025-11-21T20:04:18.454Z,ranking,"{""ip"": ""127.0.0.1"", ""location"": {""city"": """", ""region"": """", ""country"": """", ""country_code"": """", ""latitude"": """", ""longitude"": """", ""timezone"": """"}}"
+session_1763733374402_ygryjuhkq,time_update,2025-11-21T20:04:38.301Z,ranking,"{""timeOnPage"": 20, ""totalTime"": 48}"
+session_1763733374402_ygryjuhkq,page_hidden,2025-11-21T20:04:38.302Z,ranking,{}
+session_1763733374402_ygryjuhkq,page_visible,2025-11-21T20:04:42.751Z,ranking,{}
