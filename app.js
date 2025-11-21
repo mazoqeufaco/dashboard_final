@@ -972,7 +972,37 @@ async function generateReport() {
     let graphImage = null;
     
     if (canvas) {
+      try {
+        // Tenta obter a imagem do canvas
+        // Alguns navegadores podem ter problemas com CORS ou canvas "tainted"
       graphImage = canvas.toDataURL('image/png');
+        
+        // Valida se a imagem foi gerada corretamente
+        if (!graphImage || graphImage.length < 100) {
+          console.warn('Imagem do gráfico muito pequena ou inválida');
+          graphImage = null;
+        }
+      } catch (err) {
+        console.warn('Erro ao capturar gráfico do canvas:', err);
+        // Tenta criar uma imagem alternativa
+        try {
+          // Cria uma imagem vazia como fallback
+          const fallbackCanvas = document.createElement('canvas');
+          fallbackCanvas.width = 1000;
+          fallbackCanvas.height = 380;
+          const fallbackCtx = fallbackCanvas.getContext('2d');
+          fallbackCtx.fillStyle = '#0e0e0e';
+          fallbackCtx.fillRect(0, 0, 1000, 380);
+          fallbackCtx.fillStyle = '#cfcfcf';
+          fallbackCtx.font = '16px system-ui';
+          fallbackCtx.textAlign = 'center';
+          fallbackCtx.fillText('Gráfico não disponível', 500, 190);
+          graphImage = fallbackCanvas.toDataURL('image/png');
+        } catch (fallbackErr) {
+          console.error('Erro ao criar gráfico fallback:', fallbackErr);
+          graphImage = null;
+        }
+      }
     } else {
       console.warn('Gráfico não disponível para captura');
     }
@@ -1070,14 +1100,39 @@ async function generateReport() {
     }
 
     const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
+    
+    // Compatibilidade com navegadores antigos
+    const URL = window.URL || window.webkitURL || window;
+    const url = URL.createObjectURL ? URL.createObjectURL(blob) : null;
+    
+    if (!url) {
+      // Fallback para navegadores muito antigos - abre em nova janela
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const newWindow = window.open();
+        if (newWindow) {
+          newWindow.document.write('<iframe src="' + e.target.result + '" style="width:100%;height:100%;border:none;"></iframe>');
+        } else {
+          alert('Por favor, permita pop-ups para baixar o relatório PDF.');
+        }
+      };
+      reader.readAsDataURL(blob);
+      return;
+    }
+    
     const a = document.createElement('a');
     a.href = url;
     a.download = `Tribussula_report_${new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)}.pdf`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
+    
+    // Revoga URL após um delay para garantir que o download iniciou
+    setTimeout(function() {
+      if (URL.revokeObjectURL) {
+        URL.revokeObjectURL(url);
+      }
+    }, 100);
   } catch (err) {
     console.error('Erro ao gerar relatório:', err);
     
@@ -1093,55 +1148,16 @@ async function generateReport() {
 }
 
 // -------- Árvore --------
-const TREE_STRUCTURE = {
-  root: { label: 'seu problema', color: '#000' },
-  branches: {
-    'I': { 
-      label: 'Soluções prontas',
-      children: {
-        '1': { label: '1', solutions: ['I.1', 'I.2', 'I.3'] }
-      }
-    },
-    'II': { 
-      label: 'IA por API',
-      children: {
-        '1': { 
-          label: 'sem anonimização',
-          solutions: ['II.1.a', 'II.1.b']
-        },
-        '2': { 
-          label: 'com anonimização',
-          solutions: ['II.2.a', 'II.2.b']
-        }
-      }
-    },
-    'III': { 
-      label: 'IA própria',
-      children: {
-        '1': { 
-          label: 'sem engenharia reversa',
-          solutions: ['III.1a', 'III.1.b']
-        },
-        '2': { 
-          label: 'com engenharia reversa',
-          solutions: ['III.2.a', 'III.2.b', 'III.2.c']
-        }
-      }
-    }
-  }
+// Mapeamento básico de labels para ramos principais (fallback)
+const BRANCH_LABELS = {
+  'I': 'Soluções prontas',
+  'II': 'IA por API',
+  'III': 'IA própria',
+  'IV': 'Ramo IV',
+  'V': 'Ramo V'
 };
 
-// Função para converter romano para inteiro (necessária para ordenação)
-function romanToInt(r){
-  const map={I:1,V:5,X:10,L:50,C:100,D:500,M:1000}; 
-  let n=0, prev=0;
-  for(const ch of r.split('').reverse()){ 
-    const v=map[ch]||0; 
-    if(v<prev) n-=v; 
-    else n+=v, prev=v; 
-  }
-  return n;
-}
+// romanToInt já está definido acima, não duplicar
 
 // parseCoord já existe acima, não duplicar
 
@@ -1177,6 +1193,23 @@ function buildTree(items){
   return tree;
 }
 
+// Função auxiliar para gerar label de ramo secundário baseado nos dados
+function generateSecondaryLabel(pri, sec, leaves){
+  // Para ramo I (Soluções prontas), usa apenas o número (ex: "1")
+  if(pri === 'I') {
+    return String(sec);
+  }
+  
+  // Para ramos conhecidos, usa labels descritivos
+  if(pri === 'II' && sec === 1) return 'sem anonimização';
+  if(pri === 'II' && sec === 2) return 'com anonimização';
+  if(pri === 'III' && sec === 1) return 'sem engenharia reversa';
+  if(pri === 'III' && sec === 2) return 'com engenharia reversa';
+  
+  // Fallback: usa apenas o número
+  return String(sec);
+}
+
 function renderTree(tree, decimals){
   const host = document.getElementById('tree');
   if(!host){ return; }
@@ -1185,68 +1218,324 @@ function renderTree(tree, decimals){
     return; 
   }
 
-  // Renderização HTML simples (como na pasta 99D)
+  // Cria SVG para renderizar a árvore em formato de mind-map
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('width', '100%');
+  svg.setAttribute('height', '800');
+  svg.style.background = '#0a0a0a';
+  svg.style.borderRadius = '12px';
+  svg.style.overflow = 'visible';
+  
+  // Limpa o host
+  host.innerHTML = '';
+  host.appendChild(svg);
+  
+  // Estrutura de nós para posicionamento
+  const nodes = [];
+  const links = [];
+  
+  // Nó raiz: "seu problema" - posição baseada no código React
+  const rootNode = {
+    id: 'root',
+    label: 'seu problema',
+    x: 200,
+    y: 400,
+    type: 'root'
+  };
+  nodes.push(rootNode);
+  
+  // Calcula posições baseado na estrutura hierárquica (baseado no código React)
   const primKeys = [...tree.keys()].sort((a,b)=> romanToInt(a)-romanToInt(b));
-  const html = primKeys.map(pri => {
+  
+  // Posições fixas baseadas no código React
+  const branchPositions = {
+    'I': { x: 500, y: 200 },
+    'II': { x: 500, y: 400 },
+    'III': { x: 500, y: 600 }
+  };
+  
+  primKeys.forEach((pri, priIdx) => {
     const secs = tree.get(pri);
     const secKeys = [...secs.keys()].sort((a,b)=> a-b);
-    const secHtml = secKeys.map(sec => {
+    const branchLabel = BRANCH_LABELS[pri] || pri;
+    
+    // Posição do branch principal (baseada no código React)
+    const branchPos = branchPositions[pri] || { x: 500, y: 200 + priIdx * 200 };
+    const branchNode = {
+      id: `branch-${pri}`,
+      label: branchLabel,
+      x: branchPos.x,
+      y: branchPos.y,
+      type: 'branch',
+      pri: pri
+    };
+    nodes.push(branchNode);
+    links.push({ from: rootNode.id, to: branchNode.id });
+    
+    // Se não tem secundários (ramo I), coloca soluções diretas
+    if(secKeys.length === 0) return;
+    
+    // Posiciona nós secundários e soluções
+    secKeys.forEach((sec, secIdx) => {
       const leaves = secs.get(sec);
-      const leafHtml = leaves.map(l => {
-        const coordStr = l.coordStr || '';
-        const nota = l.nota ? l.nota.toFixed(decimals || 2) : 'N/A';
-        const margemErro = l.margemErro ? l.margemErro.toFixed(decimals || 2) : 'N/A';
-        
-        // Aplica cores baseadas na coordenada
-        let colorClass = '';
-        let colorStyle = '';
-        if(coordStr) {
-          if(/^I\.(1|2|3)$/.test(coordStr)) {
-            colorStyle = 'color: #ff4444;';
-          } else if(/^II\.(2|2\.a|3|2\.b)$/.test(coordStr) || coordStr === 'II.2' || coordStr === 'II.3') {
-            colorStyle = 'color: #4299e1;';
-          } else if(/^III\.1a$/.test(coordStr) || coordStr === 'III.1a') {
-            colorStyle = 'color: #4299e1;';
-          } else if(/^III\.1\.b$/.test(coordStr) || coordStr === 'III.1.b') {
-            colorStyle = 'color: #ff8c00;';
-          } else if(/^III\.2\.(a|b)$/.test(coordStr)) {
-            colorStyle = 'color: #ff8c00;';
-          } else if(/^III\.2\.c$/.test(coordStr)) {
-            colorStyle = 'color: #4299e1;';
-          }
+      const secLabel = generateSecondaryLabel(pri, sec, leaves);
+      
+      // Posição do nó secundário (baseada no código React)
+      let secX = 750;
+      let secY;
+      
+      if(pri === 'II') {
+        secY = sec === 1 ? 350 : 480;
+      } else if(pri === 'III') {
+        secY = sec === 1 ? 580 : 680;
+      } else {
+        // Fallback: distribui verticalmente
+        secY = branchPos.y + (secIdx - (secKeys.length - 1) / 2) * 60;
+      }
+      
+      const secNode = {
+        id: `sec-${pri}-${sec}`,
+        label: secLabel,
+        x: secX,
+        y: secY,
+        type: 'secondary',
+        pri: pri,
+        sec: sec
+      };
+      nodes.push(secNode);
+      links.push({ from: branchNode.id, to: secNode.id });
+      
+      // Posiciona soluções à direita, verticalmente distribuídas
+      leaves.forEach((leaf, leafIdx) => {
+        const coordStr = leaf.coordStr || '';
+        let displayName = leaf.nome;
+        if(displayName.length > 35){
+          displayName = displayName.substring(0, 32) + '...';
         }
         
-        return `<li><span class="leaf" style="${colorStyle}"><a href="#" onclick="event.preventDefault(); showSolutionModal('${l.nome.replace(/'/g, "\\'")}', '${coordStr}'); return false;">${l.nome}</a> ${coordStr ? `(${coordStr})` : ''}</span> <span class="score">(Nota=${nota}, σ=${margemErro})</span></li>`;
-      }).join('');
-      return `<li><span class="branch">${pri}.${sec}</span><ul>${leafHtml}</ul></li>`;
-    }).join('');
-    return `<li><span class="branch">${pri}</span><ul>${secHtml}</ul></li>`;
-  }).join('');
-
-  host.innerHTML = `<ul>${html}</ul>`;
+        // Distribui soluções verticalmente em torno do nó secundário
+        const solutionY = secY + (leafIdx - (leaves.length - 1) / 2) * 35;
+        const solutionX = 1000; // Posição fixa à direita (baseado no código React)
+        
+        const solutionNode = {
+          id: `sol-${coordStr}-${leafIdx}`,
+          label: `${displayName} (${coordStr})`,
+          shortLabel: leaf.nome,
+          coordStr: coordStr,
+          x: solutionX,
+          y: solutionY,
+          type: 'solution',
+          solution: leaf
+        };
+        nodes.push(solutionNode);
+        links.push({ from: secNode.id, to: solutionNode.id });
+      });
+    });
+  });
   
-  // Adicionar legenda
-  const legend = document.createElement('div');
-  legend.className = 'tree-legend';
-  legend.style.cssText = 'margin-top: 20px; padding: 15px; background: #1a1a1a; border-radius: 8px; border: 1px solid #333; color: #cfcfcf; font-size: 13px;';
+  // Função para desenhar curva bezier no estilo da imagem, evitando cruzamentos
+  function drawCurve(x1, y1, x2, y2, color = '#555', width = 2, positionOffset = 0) {
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    
+    // Calcula offset baseado na direção vertical
+    // A curva deve se projetar para FORA da linha reta entre os pontos
+    // Se a linha vai para baixo (y2 > y1), a curva deve se projetar para baixo (offset positivo)
+    // Se a linha vai para cima (y2 < y1), a curva deve se projetar para cima (offset negativo)
+    const baseOffset = Math.abs(dy) * 0.3; // 30% da distância vertical (reduzido para evitar cruzamentos)
+    
+    // Determina direção do offset baseado na direção da linha
+    let offsetDirection;
+    if(Math.abs(dy) < 5) {
+      // Linha quase horizontal - usa offset de posição
+      offsetDirection = positionOffset;
+    } else if(dy > 0) {
+      // Linha vai para baixo - curva para baixo (offset positivo)
+      offsetDirection = baseOffset;
+    } else {
+      // Linha vai para cima - curva para cima (offset negativo)
+      offsetDirection = -baseOffset;
+    }
+    
+    // Adiciona offset de posição para separar linhas próximas
+    const adjustedOffset = offsetDirection + (positionOffset * 0.2);
+    
+    // Control points baseados no código fornecido (35% e 70% da distância horizontal)
+    const cx1 = x1 + dx * 0.35;
+    const cy1 = y1 + adjustedOffset;              // primeiro ponto de controle
+    
+    const cx2 = x1 + dx * 0.70;
+    const cy2 = y2 + adjustedOffset * 0.25;        // segundo ponto de controle (volta suavemente)
+    
+    // Usa curva bezier cúbica
+    const d = `M ${x1} ${y1} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${x2} ${y2}`;
+    path.setAttribute('d', d);
+    path.setAttribute('stroke', color);
+    path.setAttribute('stroke-width', width);
+    path.setAttribute('fill', 'none');
+    return path;
+  }
   
-  legend.innerHTML = `
-    <div style="margin-bottom: 10px; font-weight: bold;">Legenda:</div>
-    <div style="display: flex; align-items: center; margin-bottom: 8px;">
-      <div style="width: 20px; height: 20px; background: #ff4444; border-radius: 3px; margin-right: 10px; border: 1px solid #555;"></div>
-      <span>confia? essas empresas terão dados da SEG</span>
-    </div>
-    <div style="display: flex; align-items: center; margin-bottom: 8px;">
-      <div style="width: 20px; height: 20px; background: #4299e1; border-radius: 3px; margin-right: 10px; border: 1px solid #555;"></div>
-      <span>plataformas com login a partir de qualquer lugar, e em qualquer horário</span>
-    </div>
-    <div style="display: flex; align-items: center; margin-bottom: 8px;">
-      <div style="width: 20px; height: 20px; background: #ff8c00; border-radius: 3px; margin-right: 10px; border: 1px solid #555;"></div>
-      <span>pode demandar instalação de novos terminais</span>
-    </div>
-  `;
+  // Agrupa links por nó de origem para calcular offsets relativos
+  const linksByFrom = new Map();
+  links.forEach(link => {
+    if(!linksByFrom.has(link.from)) {
+      linksByFrom.set(link.from, []);
+    }
+    linksByFrom.get(link.from).push(link);
+  });
   
-  host.appendChild(legend);
+  // Desenha conexões primeiro (para ficarem atrás dos nós)
+  links.forEach(link => {
+    const fromNode = nodes.find(n => n.id === link.from);
+    const toNode = nodes.find(n => n.id === link.to);
+    if(!fromNode || !toNode) return;
+    
+    // Determina cor e largura baseado no tipo de conexão
+    let color = '#555';
+    let width = 2.5; // Aumentado de 2 para 2.5
+    
+    if(toNode.type === 'solution') {
+      // Linha para solução usa cor da solução com transparência
+      const coord = parseCoord(toNode.coordStr);
+      if(coord && coord.pri === 'I') {
+        color = '#ff444466'; // Vermelho com transparência
+      } else if(coord && (coord.pri === 'II' || coord.pri === 'III')) {
+        color = '#4299e166'; // Azul com transparência
+      }
+      width = 1.5; // Aumentado de 1 para 1.5
+    } else if(toNode.type === 'secondary') {
+      color = '#444';
+      width = 2; // Aumentado de 1.5 para 2
+    }
+    
+    // Calcula offset de posição baseado nos links do mesmo nó de origem
+    const sameFromLinks = linksByFrom.get(link.from) || [];
+    const sortedSameFrom = sameFromLinks
+      .map(l => ({ link: l, toNode: nodes.find(n => n.id === l.to) }))
+      .filter(l => l.toNode)
+      .sort((a, b) => a.toNode.y - b.toNode.y);
+    
+    const linkIndex = sortedSameFrom.findIndex(l => l.link === link);
+    const totalLinks = sortedSameFrom.length;
+    
+    // Offset baseado na posição relativa (0 para o meio, negativo para cima, positivo para baixo)
+    const positionOffset = totalLinks > 1 
+      ? (linkIndex - (totalLinks - 1) / 2) * 15 
+      : 0;
+    
+    const path = drawCurve(fromNode.x, fromNode.y, toNode.x, toNode.y, color, width, positionOffset);
+    svg.appendChild(path);
+  });
+  
+  // Função para determinar cor do círculo baseado no tipo e coordenada (baseada no código React)
+  function getCircleColor(node) {
+    if(node.type === 'root') {
+      return '#888'; // Cinza para root
+    }
+    if(node.type === 'branch' || node.type === 'secondary') {
+      return '#666'; // Cinza mais escuro para branches
+    }
+    if(node.type === 'solution' && node.coordStr) {
+      // Determina cor baseado na coordenada (baseado no código React)
+      const coord = parseCoord(node.coordStr);
+      if(coord && coord.pri === 'I') {
+        return '#ff4444'; // Vermelho para Soluções prontas
+      } else if(coord && coord.pri === 'III' && coord.sec === 1 && coord.ter === 'b') {
+        return '#ff8c00'; // Laranja para PLIM 2.0 DMZ na SEG (III.1.b)
+      } else if(coord && coord.pri === 'III' && coord.sec === 2) {
+        // Para III.2, verifica qual solução
+        if(coord.ter === 'a' || coord.ter === 'b') {
+          return '#ff8c00'; // Laranja
+        } else if(coord.ter === 'c') {
+          return '#4299e1'; // Azul
+        }
+      }
+      // Padrão: azul para II e III
+      return '#4299e1';
+    }
+    return '#666'; // Fallback
+  }
+  
+  // Desenha nós (baseado no código React)
+  nodes.forEach(node => {
+    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    circle.setAttribute('cx', node.x);
+    circle.setAttribute('cy', node.y);
+    const radius = node.type === 'root' ? 8 : node.type === 'solution' ? 8 : 6;
+    circle.setAttribute('r', radius);
+    const fillColor = getCircleColor(node);
+    circle.setAttribute('fill', fillColor);
+    
+    // Borda baseada no tipo (baseado no código React)
+    if(node.type === 'solution') {
+      circle.setAttribute('stroke', fillColor);
+      circle.setAttribute('stroke-width', '1.5');
+    } else {
+      circle.setAttribute('stroke', '#444');
+      circle.setAttribute('stroke-width', '1');
+    }
+    
+    if(node.type === 'solution'){
+      circle.style.cursor = 'pointer';
+    }
+    svg.appendChild(circle);
+    
+    // Texto do nó - posicionado à direita (baseado no código React)
+    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    text.setAttribute('x', node.x + 15); // Offset à direita
+    text.setAttribute('y', node.y + 4); // Alinhado verticalmente
+    text.setAttribute('text-anchor', 'start');
+    
+    // Cores e fontes - texto claro para todos (como na imagem)
+    if(node.type === 'root') {
+      text.setAttribute('fill', '#fff');
+      text.setAttribute('font-size', '14');
+      text.setAttribute('font-weight', 'bold');
+    } else if(node.type === 'solution') {
+      text.setAttribute('fill', '#cfcfcf');
+      text.setAttribute('font-size', '12');
+      text.setAttribute('font-weight', 'normal');
+    } else {
+      text.setAttribute('fill', '#aaa');
+      text.setAttribute('font-size', '12');
+      text.setAttribute('font-weight', 'normal');
+    }
+    
+    // Define o texto do label
+    text.textContent = node.label;
+    
+    if(node.type === 'solution'){
+      text.style.cursor = 'pointer';
+      text.style.textDecoration = 'underline';
+    }
+    svg.appendChild(text);
+    
+    // Adiciona clique para soluções
+    if(node.type === 'solution' && node.solution){
+      circle.addEventListener('click', (e) => {
+        e.preventDefault();
+        showSolutionModal(node.shortLabel, node.coordStr);
+      });
+      text.addEventListener('click', (e) => {
+        e.preventDefault();
+        showSolutionModal(node.shortLabel, node.coordStr);
+      });
+    }
+  });
+  
+  
+  // Ajusta viewBox para incluir todos os nós com padding adequado
+  const allX = nodes.map(n => n.x);
+  const allY = nodes.map(n => n.y);
+  const minX = Math.min(...allX) - 100;
+  const maxX = Math.max(...allX) + 300;
+  const minY = Math.min(...allY) - 100;
+  const maxY = Math.max(...allY) + 100;
+  svg.setAttribute('viewBox', `${minX} ${minY} ${maxX - minX} ${maxY - minY}`);
+  svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
 }
 
 // -------- toggle helpers --------
@@ -1332,17 +1621,83 @@ function toggle(el){ el.style.display = (el.style.display==='none' || !el.style.
             alert('Por favor, confirme as prioridades primeiro para gerar o relatório.');
             return;
           }
+          if(reportConfirmDlg){
+            // Salva posição de scroll atual
+            const scrollY = window.scrollY || window.pageYOffset;
+            
+            // Previne scroll do body quando modal está aberto
+            document.body.style.position = 'fixed';
+            document.body.style.top = `-${scrollY}px`;
+            document.body.style.width = '100%';
+            document.body.style.overflow = 'hidden';
+            
           reportConfirmDlg.showModal();
+            
+            // Força centralização após abrir o modal (para garantir em todos os navegadores)
+            setTimeout(() => {
+              const dialog = reportConfirmDlg;
+              if(dialog && dialog.open){
+                // Garante posicionamento fixo baseado na viewport
+                dialog.style.margin = 'auto';
+                dialog.style.position = 'fixed';
+                dialog.style.top = '0';
+                dialog.style.left = '0';
+                dialog.style.right = '0';
+                dialog.style.bottom = '0';
+                dialog.style.inset = '0';
+                if(window.innerWidth <= 768){
+                  dialog.style.maxHeight = '85vh';
+                }
+              }
+            }, 10);
+            
+            // Função para restaurar scroll
+            const restoreScroll = () => {
+              const savedScrollY = document.body.style.top;
+              document.body.style.position = '';
+              document.body.style.top = '';
+              document.body.style.width = '';
+              document.body.style.overflow = '';
+              if(savedScrollY){
+                window.scrollTo(0, parseInt(savedScrollY.replace('-', '').replace('px', '')) || scrollY);
+              } else {
+                window.scrollTo(0, scrollY);
+              }
+            };
+            
+            // Adiciona listeners para restaurar scroll ao fechar
+            reportConfirmDlg.addEventListener('close', restoreScroll, { once: true });
+          }
         });
         
         if(reportConfirmCancel){
           reportConfirmCancel.addEventListener('click', () => {
+            // Restaura scroll antes de fechar
+            const savedScrollY = document.body.style.top;
+            if(savedScrollY){
+              document.body.style.position = '';
+              document.body.style.top = '';
+              document.body.style.width = '';
+              document.body.style.overflow = '';
+              const scrollValue = parseInt(savedScrollY.replace('-', '').replace('px', '')) || 0;
+              window.scrollTo(0, scrollValue);
+            }
             reportConfirmDlg.close();
           });
         }
         
         if(reportConfirmOk){
           reportConfirmOk.addEventListener('click', async () => {
+            // Restaura scroll antes de fechar
+            const savedScrollY = document.body.style.top;
+            if(savedScrollY){
+              document.body.style.position = '';
+              document.body.style.top = '';
+              document.body.style.width = '';
+              document.body.style.overflow = '';
+              const scrollValue = parseInt(savedScrollY.replace('-', '').replace('px', '')) || 0;
+              window.scrollTo(0, scrollValue);
+            }
             reportConfirmDlg.close();
             await generateReport();
           });

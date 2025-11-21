@@ -34,15 +34,30 @@ if (isProduction) {
 // Inicia backend Python
 console.log('🐍 Iniciando backend Python...');
 // Tenta python3 primeiro (comum no Linux/Railway), depois python
-const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
-console.log(`🔍 Comando Python: ${pythonCmd}`);
+let pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
+let pythonArgs = ['backend.py'];
+
+// No Mac, se Node está em ARM64 mas Python precisa de x86_64 (ou vice-versa),
+// força x86_64 para garantir compatibilidade com Pillow instalado
+if (process.platform === 'darwin') {
+  // Verifica se precisa forçar arquitetura
+  // Se Node está em ARM64 mas Pillow está em x86_64, força x86_64
+  if (process.arch === 'arm64') {
+    pythonCmd = 'arch';
+    pythonArgs = ['-x86_64', 'python3', 'backend.py'];
+    console.log('🔍 Mac ARM64 detectado: forçando Python em modo x86_64 para compatibilidade');
+  }
+}
+
+console.log(`🔍 Comando Python: ${pythonCmd} ${pythonArgs.join(' ')}`);
+console.log(`🔍 Arquitetura Node.js: ${process.arch}`);
 console.log(`🔍 Diretório: ${projectDir}`);
 console.log(`🔍 Variáveis de ambiente:`);
 console.log(`   PYTHONUNBUFFERED=${process.env.PYTHONUNBUFFERED || 'não definido'}`);
 console.log(`   FLASK_ENV=${process.env.FLASK_ENV || 'não definido'}`);
 console.log(`   BACKEND_PORT=${process.env.BACKEND_PORT || 'não definido'}`);
 
-const pythonBackend = spawn(pythonCmd, ['backend.py'], {
+const pythonBackend = spawn(pythonCmd, pythonArgs, {
   cwd: projectDir,
   env: { ...process.env },
   stdio: ['ignore', 'pipe', 'pipe']

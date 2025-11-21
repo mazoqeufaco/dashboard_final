@@ -475,32 +475,80 @@ def generate_report():
         # Graph image - na mesma página do ranking
         if graph_image_base64:
             try:
-                # Remove data URL prefix if present
+                # Remove data URL prefix if present (data:image/png;base64,)
+                graph_image_clean = graph_image_base64
                 if ',' in graph_image_base64:
-                    graph_image_base64 = graph_image_base64.split(',')[1]
+                    graph_image_clean = graph_image_base64.split(',')[1]
+                elif 'base64,' in graph_image_base64:
+                    graph_image_clean = graph_image_base64.split('base64,')[1]
                 
-                # Decode base64 image
-                image_data = base64.b64decode(graph_image_base64)
+                # Valida se há dados válidos
+                if not graph_image_clean or len(graph_image_clean) < 100:
+                    raise ValueError('Dados de imagem base64 inválidos ou muito pequenos')
+                
+                # Decode base64 image com tratamento de erros
+                try:
+                    image_data = base64.b64decode(graph_image_clean, validate=True)
+                except Exception as decode_err:
+                    print(f"Erro ao decodificar base64: {decode_err}")
+                    # Tenta decodificar sem validação (mais permissivo)
+                    image_data = base64.b64decode(graph_image_clean)
+                
+                if not image_data or len(image_data) < 100:
+                    raise ValueError('Dados de imagem decodificados inválidos')
+                
                 img_buffer = BytesIO(image_data)
                 img = PILImage.open(img_buffer)
+                
+                # Valida se a imagem foi aberta corretamente
+                if not img or img.size[0] == 0 or img.size[1] == 0:
+                    raise ValueError('Imagem inválida após abertura')
                 
                 # Convert to RGB if necessary
                 if img.mode == 'RGBA':
                     rgb_img = PILImage.new('RGB', img.size, (255, 255, 255))
-                    rgb_img.paste(img, mask=img.split()[3])
+                    rgb_img.paste(img, mask=img.split()[3] if len(img.split()) > 3 else None)
                     img = rgb_img
+                elif img.mode not in ('RGB', 'L', 'P'):
+                    # Converte outros modos para RGB
+                    img = img.convert('RGB')
                 
                 # Save to buffer
                 img_buffer = BytesIO()
                 img.save(img_buffer, format='PNG')
                 img_buffer.seek(0)
                 
+                # Calcula proporção para manter aspecto
+                img_width, img_height = img.size
+                max_width = 6 * inch
+                max_height = 2.3 * inch
+                aspect_ratio = img_width / img_height
+                
+                if img_width > max_width or img_height > max_height:
+                    if aspect_ratio > (max_width / max_height):
+                        final_width = max_width
+                        final_height = max_width / aspect_ratio
+                    else:
+                        final_height = max_height
+                        final_width = max_height * aspect_ratio
+                else:
+                    final_width = img_width
+                    final_height = img_height
+                
                 # Add image to PDF - ajusta tamanho para caber na mesma página
-                reportlab_img = Image(img_buffer, width=6*inch, height=2.3*inch)
+                reportlab_img = Image(img_buffer, width=final_width, height=final_height)
                 elements.append(reportlab_img)
             except Exception as e:
                 print(f"Erro ao adicionar gráfico ao PDF: {e}")
-                elements.append(Paragraph(f"<i>Gráfico não disponível: {str(e)}</i>", styles['Normal']))
+                import traceback
+                traceback.print_exc()
+                # Adiciona mensagem amigável em vez de erro técnico
+                elements.append(Spacer(1, 12))
+                elements.append(Paragraph(
+                    "<i>Gráfico não pôde ser incluído no relatório. O gráfico está disponível na interface web.</i>", 
+                    styles['Normal']
+                ))
+                elements.append(Spacer(1, 12))
         
         # Podium section - Ouro, Prata, Bronze (nova página)
         if podium and len(podium) > 0:
@@ -647,10 +695,14 @@ def generate_report():
             ])
         
         # Send email with PDF
+        email_sent = False
+        email_error = None
         try:
             send_email_with_pdf(pdf_data, date_str, time_str, report_hash)
+            email_sent = True
             print(f"✅ Email enviado com sucesso!")
         except Exception as e:
+            email_error = str(e)
             print(f"❌ Erro ao enviar email: {e}")
             import traceback
             traceback.print_exc()
@@ -689,8 +741,14 @@ def send_email_with_pdf(pdf_data, date_str, time_str, report_hash):
             email_to_list = ['noetikaai@gmail.com']
         
         if not email_password:
-            print("⚠️ EMAIL_PASSWORD não configurado. Email não será enviado.")
-            return
+            error_msg = "⚠️ EMAIL_PASSWORD não configurado. Email não será enviado."
+            print(error_msg)
+            print("💡 Para configurar:")
+            print("   1. Crie um arquivo .env na raiz do projeto")
+            print("   2. Adicione: EMAIL_PASSWORD=sua_senha_de_app_gmail")
+            print("   3. Para gerar senha de app: https://myaccount.google.com/apppasswords")
+            print("   4. Veja mais detalhes em: CONFIGURACAO-EMAIL.md")
+            raise ValueError(error_msg)
         
         # Create message
         msg = MIMEMultipart()

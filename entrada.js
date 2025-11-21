@@ -134,18 +134,196 @@ function detectVerticesByAlpha(img,w,h){
   }
 }
 
-function drawScene(ctx, canvas, img, rect, point){
-  ctx.fillStyle='#000'; ctx.fillRect(0,0,canvas.width,canvas.height);
+function drawScene(ctx, canvas, img, rect, point, rgb=[1/3,1/3,1/3], vertices=null){
+  // Fundo preto
+  ctx.fillStyle='#000'; 
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  
+  // Se temos vértices, desenha triângulo colorido dinamicamente
+  if(vertices && vertices.top && vertices.left && vertices.right && rgb && rgb.length === 3){
+    const [r, g, b] = rgb;
+    const r255 = Math.round(r * 255);
+    const g255 = Math.round(g * 255);
+    const b255 = Math.round(b * 255);
+    
+    const topX = rect.x + vertices.top.x;
+    const topY = rect.y + vertices.top.y;
+    const leftX = rect.x + vertices.left.x;
+    const leftY = rect.y + vertices.left.y;
+    const rightX = rect.x + vertices.right.x;
+    const rightY = rect.y + vertices.right.y;
+    
+    // Cores dos vértices conforme especificado
+    // Topo (Prazo): #0d09e8 (rgb(13,9,232))
+    // Esquerda (Custo): #f20308 (rgb(242,3,8))
+    // Direita (Qualidade): #13e40a (rgb(19,228,10))
+    // As pontas SEMPRE têm as cores puras e saturadas
+    const topColorFull = '#0d09e8';      // Azul/roxo escuro no topo (prazo) - cor pura
+    const leftColorFull = '#f20308';     // Vermelho à esquerda (custo) - cor pura
+    const rightColorFull = '#13e40a';   // Verde à direita (qualidade) - cor pura
+    
+    ctx.save();
+    
+    // Define o caminho do triângulo
+    ctx.beginPath();
+    ctx.moveTo(topX, topY);
+    ctx.lineTo(leftX, leftY);
+    ctx.lineTo(rightX, rightY);
+    ctx.closePath();
+    
+    // Clip para limitar o desenho ao triângulo
+    ctx.clip();
+    
+    // Calcula distâncias para gradientes
+    const centerX = (topX + leftX + rightX) / 3;
+    const centerY = (topY + leftY + rightY) / 3;
+    const maxDist = Math.max(
+      Math.sqrt((topX-centerX)**2 + (topY-centerY)**2),
+      Math.sqrt((leftX-centerX)**2 + (leftY-centerY)**2),
+      Math.sqrt((rightX-centerX)**2 + (rightY-centerY)**2)
+    ) * 2.5; // Alcance maior para gradiente mais completo
+    
+    // Usa coordenadas baricêntricas para calcular cor de cada pixel
+    // Cores dos vértices conforme especificado
+    const colorTop = [13, 9, 232];      // #0d09e8 (azul) - Topo
+    const colorLeft = [242, 3, 8];     // #f20308 (vermelho) - Esquerda
+    const colorRight = [19, 228, 10];   // #13e40a (verde) - Direita
+    
+    // Função para calcular cor usando coordenadas baricêntricas
+    function barycentricColor(x, y, A, B, C, colorA, colorB, colorC) {
+      const denom = ((B.y - C.y) * (A.x - C.x) + (C.x - B.x) * (A.y - C.y));
+      if (Math.abs(denom) < 0.0001) return null; // Evita divisão por zero
+      
+      const w1 = ((B.y - C.y) * (x - C.x) + (C.x - B.x) * (y - C.y)) / denom;
+      const w2 = ((C.y - A.y) * (x - C.x) + (A.x - C.x) * (y - C.y)) / denom;
+      const w3 = 1 - w1 - w2;
+      
+      // Interpola as cores
+      const r = Math.round(w1 * colorA[0] + w2 * colorB[0] + w3 * colorC[0]);
+      const g = Math.round(w1 * colorA[1] + w2 * colorB[1] + w3 * colorC[1]);
+      const b = Math.round(w1 * colorA[2] + w2 * colorB[2] + w3 * colorC[2]);
+      
+      return [r, g, b];
+    }
+    
+    // Cria imagem de dados
+    const imageData = ctx.createImageData(canvas.width, canvas.height);
+    const data = imageData.data;
+    
+    // Vértices do triângulo
+    const A = { x: topX, y: topY };
+    const B = { x: leftX, y: leftY };
+    const C = { x: rightX, y: rightY };
+    
+    // Calcula área do triângulo original para verificação
+    const areaOrig = Math.abs(
+      A.x * (B.y - C.y) + B.x * (C.y - A.y) + C.x * (A.y - B.y)
+    );
+    
+    // Para cada pixel, calcula se está dentro do triângulo e sua cor
+    for (let y = 0; y < canvas.height; y++) {
+      for (let x = 0; x < canvas.width; x++) {
+        const i = (y * canvas.width + x) * 4;
+        
+        // Verifica se o pixel está dentro do triângulo usando áreas
+        const area1 = Math.abs(
+          x * (B.y - C.y) + B.x * (C.y - y) + C.x * (y - B.y)
+        );
+        const area2 = Math.abs(
+          A.x * (y - C.y) + x * (C.y - A.y) + C.x * (A.y - y)
+        );
+        const area3 = Math.abs(
+          A.x * (B.y - y) + B.x * (y - A.y) + x * (A.y - B.y)
+        );
+        
+        // Se a soma das áreas dos sub-triângulos é igual à área original (com tolerância)
+        // Usa tolerância fixa como no exemplo fornecido
+        if (Math.abs(area1 + area2 + area3 - areaOrig) < 0.1) {
+          // Calcula cor usando coordenadas baricêntricas
+          const rgb = barycentricColor(x, y, A, B, C, colorTop, colorLeft, colorRight);
+          if (rgb) {
+            data[i] = rgb[0];     // R
+            data[i + 1] = rgb[1]; // G
+            data[i + 2] = rgb[2]; // B
+            data[i + 3] = 255;    // A (opaco)
+          } else {
+            data[i] = 0;
+            data[i + 1] = 0;
+            data[i + 2] = 0;
+            data[i + 3] = 0; // Transparente
+          }
+        } else {
+          // Fora do triângulo - transparente
+          data[i] = 0;
+          data[i + 1] = 0;
+          data[i + 2] = 0;
+          data[i + 3] = 0;
+        }
+      }
+    }
+    
+    // Desenha a imagem de dados no canvas
+    ctx.putImageData(imageData, 0, 0);
+    
+    ctx.restore();
+  } else {
+    // Fallback: desenha apenas a imagem original
   ctx.drawImage(img,rect.x,rect.y,rect.w,rect.h);
-  if(point){
-    ctx.fillStyle='#fff'; ctx.strokeStyle='#000'; ctx.lineWidth=2;
-    ctx.beginPath(); ctx.arc(point[0],point[1],8,0,Math.PI*2); ctx.fill(); ctx.stroke();
   }
+  
+  // Desenha o ponto indicador branco
+  if(point){
+    ctx.fillStyle='#fff'; 
+    ctx.strokeStyle='#000'; 
+    ctx.lineWidth=2;
+    ctx.beginPath(); 
+    ctx.arc(point[0],point[1],8,0,Math.PI*2); 
+    ctx.fill(); 
+    ctx.stroke();
+  }
+}
+
+// Função para redimensionar canvas responsivamente
+function resizeCanvas(canvas) {
+  const container = canvas.parentElement;
+  if (!container) return;
+  
+  const containerWidth = container.clientWidth;
+  const maxWidth = Math.min(containerWidth - 32, 900); // -32 para padding
+  const aspectRatio = 900 / 620; // Proporção original do canvas
+  
+  // Calcula altura baseada na largura, respeitando max-height em mobile
+  let newWidth = maxWidth;
+  let newHeight = newWidth / aspectRatio;
+  
+  // Em mobile, limita altura máxima para não ultrapassar a viewport
+  if (window.innerWidth <= 768) {
+    const maxHeight = window.innerHeight * 0.7; // 70vh
+    if (newHeight > maxHeight) {
+      newHeight = maxHeight;
+      newWidth = newHeight * aspectRatio;
+    }
+  }
+  
+  // Ajusta o tamanho interno do canvas (resolução) - deve ser inteiro
+  canvas.width = Math.floor(newWidth);
+  canvas.height = Math.floor(newHeight);
+  
+  // Ajusta o tamanho de exibição CSS - mantém proporção exata
+  canvas.style.width = Math.floor(newWidth) + 'px';
+  canvas.style.height = Math.floor(newHeight) + 'px';
+  canvas.style.maxWidth = '100%';
+  // Usa aspect-ratio CSS para manter proporção mesmo se houver conflitos
+  canvas.style.aspectRatio = `${Math.floor(newWidth)} / ${Math.floor(newHeight)}`;
 }
 
 export async function initEntrada(opts={}){
   const cfg={...DEFAULTS,...opts, ui:{...DEFAULTS.ui, ...(opts.ui||{})}};
   const canvas=document.getElementById(cfg.canvasId);
+  
+  // Redimensiona canvas inicialmente
+  resizeCanvas(canvas);
+  
   const ctx=canvas.getContext('2d');
   const rEl=document.querySelector(cfg.ui.rSel);
   const gEl=document.querySelector(cfg.ui.gSel);
@@ -182,14 +360,31 @@ export async function initEntrada(opts={}){
     img.src=cfg.imgSrc; 
   });
 
-  const padTop=30,padBottom=30; // Padding equilibrado
-  const maxW=canvas.width-40, maxH=canvas.height-padTop-padBottom;
-  const scale=Math.min(maxW/img.width, maxH/img.height) * 0.7; // 70% do box inteiro
-  const w=Math.round(img.width*scale), h=Math.round(img.height*scale);
-  const x=Math.floor((canvas.width-w)/2);
-  // Posiciona o triângulo um pouco mais para baixo para equilibrar espaçamentos
-  const y=padTop + Math.floor((canvas.height - padTop - padBottom - h) * 0.5);
-  const rect={x,y,w,h};
+  // Calcula posição e tamanho do triângulo dentro do canvas
+  // Usa padding adaptativo baseado no tamanho do canvas
+  const padTop = Math.max(20, canvas.height * 0.05);
+  const padBottom = Math.max(20, canvas.height * 0.05);
+  const padSides = Math.max(20, canvas.width * 0.02);
+  const maxW = canvas.width - (padSides * 2);
+  const maxH = canvas.height - padTop - padBottom;
+  
+  // Calcula escala mantendo proporção da imagem
+  const imgAspect = img.width / img.height;
+  const canvasAspect = maxW / maxH;
+  
+  let scale;
+  if (imgAspect > canvasAspect) {
+    // Imagem é mais larga - limita pela largura
+    scale = (maxW / img.width) * 0.85; // 85% da largura disponível
+  } else {
+    // Imagem é mais alta - limita pela altura
+    scale = (maxH / img.height) * 0.85; // 85% da altura disponível
+  }
+  
+  const w = Math.round(img.width * scale);
+  const h = Math.round(img.height * scale);
+  const x = Math.floor((canvas.width - w) / 2);
+  const y = padTop + Math.floor((canvas.height - padTop - padBottom - h) / 2);
 
   // Tenta detectar vértices, com fallback seguro
   let v;
@@ -212,15 +407,100 @@ export async function initEntrada(opts={}){
     };
   }
   
-  const Vtop={x:x+v.top.x,y:y+v.top.y};
-  const Vleft={x:x+v.left.x,y:y+v.left.y};
-  const Vright={x:x+v.right.x,y:y+v.right.y};
+  // Variáveis que serão atualizadas no resize
+  let rect={x,y,w,h};
+  let Vtop={x:x+v.top.x,y:y+v.top.y};
+  let Vleft={x:x+v.left.x,y:y+v.left.y};
+  let Vright={x:x+v.right.x,y:y+v.right.y};
 
   let rgb=[1/3,1/3,1/3]; let dragging=false;
 
-  const drawFromRGB=()=>{ const [wt,wl,wr]=rgbToBary(rgb,cfg.vertexToChannel);
+  // Função para recalcular posições quando canvas é redimensionado
+  const recalculateTriangle = () => {
+    resizeCanvas(canvas);
+    
+    // Recalcula posição e tamanho do triângulo
+    const padTop = Math.max(20, canvas.height * 0.05);
+    const padBottom = Math.max(20, canvas.height * 0.05);
+    const padSides = Math.max(20, canvas.width * 0.02);
+    const maxW = canvas.width - (padSides * 2);
+    const maxH = canvas.height - padTop - padBottom;
+    
+    const imgAspect = img.width / img.height;
+    const canvasAspect = maxW / maxH;
+    
+    let scale;
+    if (imgAspect > canvasAspect) {
+      scale = (maxW / img.width) * 0.85;
+    } else {
+      scale = (maxH / img.height) * 0.85;
+    }
+    
+    const w = Math.round(img.width * scale);
+    const h = Math.round(img.height * scale);
+    const x = Math.floor((canvas.width - w) / 2);
+    const y = padTop + Math.floor((canvas.height - padTop - padBottom - h) / 2);
+    
+    rect = {x, y, w, h};
+    
+    // Recalcula vértices proporcionalmente
+    const scaleX = w / img.width;
+    const scaleY = h / img.height;
+    const newV = {
+      top: {x: Math.floor(v.top.x * scaleX), y: Math.floor(v.top.y * scaleY)},
+      left: {x: Math.floor(v.left.x * scaleX), y: Math.floor(v.left.y * scaleY)},
+      right: {x: Math.floor(v.right.x * scaleX), y: Math.floor(v.right.y * scaleY)}
+    };
+    
+    Vtop = {x: x + newV.top.x, y: y + newV.top.y};
+    Vleft = {x: x + newV.left.x, y: y + newV.left.y};
+    Vright = {x: x + newV.right.x, y: y + newV.right.y};
+    
+    // Redesenha
+    drawFromRGB();
+  };
+
+  const drawFromRGB=()=>{ 
+    const [wt,wl,wr]=rgbToBary(rgb,cfg.vertexToChannel);
     const px=wt*Vtop.x+wl*Vleft.x+wr*Vright.x, py=wt*Vtop.y+wl*Vleft.y+wr*Vright.y;
-    drawScene(ctx,canvas,img,rect,[px,py]); };
+    drawScene(ctx,canvas,img,rect,[px,py],rgb,v); 
+  };
+  
+  // Listener para redimensionamento da janela
+  let resizeTimeout;
+  const handleResize = () => {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(() => {
+      recalculateTriangle();
+    }, 150);
+  };
+  window.addEventListener('resize', handleResize);
+  
+  // Observa mudanças no DOM que podem afetar o layout (como ranking abrindo)
+  const observer = new MutationObserver(() => {
+    // Recalcula triângulo quando há mudanças no DOM que podem afetar o layout
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(() => {
+      recalculateTriangle();
+    }, 100);
+  });
+  
+  // Observa mudanças no container do triângulo e elementos próximos
+  if(canvas.parentElement){
+    observer.observe(canvas.parentElement, {
+      attributes: true,
+      attributeFilter: ['style', 'class'],
+      childList: false,
+      subtree: false
+    });
+  }
+  
+  // Observa mudanças no body que podem indicar ranking abrindo/fechando
+  observer.observe(document.body, {
+    attributes: false,
+    childList: true,
+    subtree: false
+  });
 
   function setPerc(r,g,b,draw=true){
     rEl.value=r.toFixed(2); gEl.value=g.toFixed(2); bEl.value=b.toFixed(2);
@@ -251,19 +531,52 @@ export async function initEntrada(opts={}){
     setPerc(r*100,g*100,b*100);
     return true;
   };
+  // Suporte para mouse e touch
+  const getPointFromEvent = (e) => {
+    const r = canvas.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return {
+      x: clientX - r.left,
+      y: clientY - r.top
+    };
+  };
+
+  // Mouse events
   canvas.addEventListener('mousedown',e=>{
-    const r=canvas.getBoundingClientRect();
-    dragging=handlePoint(e.clientX-r.left,e.clientY-r.top);
+    const pt = getPointFromEvent(e);
+    dragging=handlePoint(pt.x, pt.y);
   });
   canvas.addEventListener('mousemove',e=>{
     if(!dragging) return;
-    const r=canvas.getBoundingClientRect();
-    handlePoint(e.clientX-r.left,e.clientY-r.top);
+    const pt = getPointFromEvent(e);
+    handlePoint(pt.x, pt.y);
   });
   window.addEventListener('mouseup',()=>{ dragging=false; });
   canvas.addEventListener('click',e=>{
-    const r=canvas.getBoundingClientRect();
-    handlePoint(e.clientX-r.left,e.clientY-r.top);
+    const pt = getPointFromEvent(e);
+    handlePoint(pt.x, pt.y);
+  });
+  
+  // Touch events para mobile
+  canvas.addEventListener('touchstart',e=>{
+    e.preventDefault();
+    const pt = getPointFromEvent(e);
+    dragging=handlePoint(pt.x, pt.y);
+  });
+  canvas.addEventListener('touchmove',e=>{
+    e.preventDefault();
+    if(!dragging) return;
+    const pt = getPointFromEvent(e);
+    handlePoint(pt.x, pt.y);
+  });
+  canvas.addEventListener('touchend',e=>{
+    e.preventDefault();
+    dragging=false;
+  });
+  canvas.addEventListener('touchcancel',e=>{
+    e.preventDefault();
+    dragging=false;
   });
 
   let onConfirm=null;
