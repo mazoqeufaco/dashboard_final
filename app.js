@@ -1093,10 +1093,10 @@ async function generateReport() {
         graphImage,
         sessionId,
         location: {
-          city: trackingSession?.location?.city || '',
-          region: trackingSession?.location?.region || '',
-          country: trackingSession?.location?.country || '',
-          ip: trackingSession?.ip || ''
+          city: (typeof window.trackingSession !== 'undefined' && window.trackingSession?.location?.city) || '',
+          region: (typeof window.trackingSession !== 'undefined' && window.trackingSession?.location?.region) || '',
+          country: (typeof window.trackingSession !== 'undefined' && window.trackingSession?.location?.country) || '',
+          ip: (typeof window.trackingSession !== 'undefined' && window.trackingSession?.ip) || ''
         }
       })
     });
