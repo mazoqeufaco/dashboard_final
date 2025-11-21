@@ -57,28 +57,31 @@ def health_check():
 
 # Initialize CSV files if they don't exist
 def init_csv_files():
-    if not SESSIONS_CSV.exists():
-        with open(SESSIONS_CSV, 'w', newline='', encoding='utf-8') as f:
-            writer = csv.writer(f)
-            writer.writerow([
-                'session_id', 'start_time', 'user_agent', 'screen_resolution',
-                'language', 'referrer', 'ip', 'city', 'region', 'country',
-                'country_code', 'latitude', 'longitude', 'timezone'
-            ])
-    
-    if not EVENTS_CSV.exists():
-        with open(EVENTS_CSV, 'w', newline='', encoding='utf-8') as f:
-            writer = csv.writer(f)
-            writer.writerow([
-                'session_id', 'event_type', 'timestamp', 'page', 'event_data'
-            ])
-    
-    if not REPORTS_CSV.exists():
-        with open(REPORTS_CSV, 'w', newline='', encoding='utf-8') as f:
-            writer = csv.writer(f)
-            writer.writerow([
-                'hash', 'session_id', 'generated_at', 'ip', 'city', 'priorities'
-            ])
+    try:
+        if not SESSIONS_CSV.exists():
+            with open(SESSIONS_CSV, 'w', newline='', encoding='utf-8') as f:
+                writer = csv.writer(f)
+                writer.writerow([
+                    'session_id', 'start_time', 'user_agent', 'screen_resolution',
+                    'language', 'referrer', 'ip', 'city', 'region', 'country',
+                    'country_code', 'latitude', 'longitude', 'timezone'
+                ])
+        
+        if not EVENTS_CSV.exists():
+            with open(EVENTS_CSV, 'w', newline='', encoding='utf-8') as f:
+                writer = csv.writer(f)
+                writer.writerow([
+                    'session_id', 'event_type', 'timestamp', 'page', 'event_data'
+                ])
+        
+        if not REPORTS_CSV.exists():
+            with open(REPORTS_CSV, 'w', newline='', encoding='utf-8') as f:
+                writer = csv.writer(f)
+                writer.writerow([
+                    'hash', 'session_id', 'generated_at', 'ip', 'city', 'priorities'
+                ])
+    except OSError as e:
+        print(f"⚠️ Aviso: Não foi possível inicializar arquivos CSV (provavelmente ambiente read-only): {e}")
 
 init_csv_files()
 
@@ -210,53 +213,8 @@ def track_event():
             
             # Always save session if it's new
             # Update existing session only if location data is now available and wasn't before
-            if not session_exists:
-                # Add new session
-                with open(SESSIONS_CSV, 'a', newline='', encoding='utf-8') as f:
-                    writer = csv.writer(f)
-                    writer.writerow([
-                        session_id,
-                        session.get('startTime', ''),
-                        session.get('userAgent', ''),
-                        session.get('screenResolution', ''),
-                        session.get('language', ''),
-                        session.get('referrer', ''),
-                        session_ip,
-                        location.get('city', '') if location else '',
-                        location.get('region', '') if location else '',
-                        location.get('country', '') if location else '',
-                        location.get('country_code', '') if location else '',
-                        str(location.get('latitude', '')) if location else '',
-                        str(location.get('longitude', '')) if location else '',
-                        location.get('timezone', '') if location else ''
-                    ])
-            elif has_location_data and not session_has_location:
-                # Update existing session with new location data
-                if session_exists:
-                    # Update existing session - read all rows, update, rewrite
-                    updated_rows = []
-                    with open(SESSIONS_CSV, 'r', encoding='utf-8') as f:
-                        reader = csv.DictReader(f)
-                        for row in reader:
-                            if row['session_id'] == session_id:
-                                # Update this row with new location data
-                                row['ip'] = session_ip if session_ip else row.get('ip', '')
-                                row['city'] = location.get('city', '') if location else row.get('city', '')
-                                row['region'] = location.get('region', '') if location else row.get('region', '')
-                                row['country'] = location.get('country', '') if location else row.get('country', '')
-                                row['country_code'] = location.get('country_code', '') if location else row.get('country_code', '')
-                                row['latitude'] = str(location.get('latitude', '')) if location else row.get('latitude', '')
-                                row['longitude'] = str(location.get('longitude', '')) if location else row.get('longitude', '')
-                                row['timezone'] = location.get('timezone', '') if location else row.get('timezone', '')
-                            updated_rows.append(row)
-                    
-                    # Rewrite CSV with updated data
-                    with open(SESSIONS_CSV, 'w', newline='', encoding='utf-8') as f:
-                        if updated_rows:
-                            writer = csv.DictWriter(f, fieldnames=updated_rows[0].keys())
-                            writer.writeheader()
-                            writer.writerows(updated_rows)
-                else:
+            try:
+                if not session_exists:
                     # Add new session
                     with open(SESSIONS_CSV, 'a', newline='', encoding='utf-8') as f:
                         writer = csv.writer(f)
@@ -276,18 +234,69 @@ def track_event():
                             str(location.get('longitude', '')) if location else '',
                             location.get('timezone', '') if location else ''
                         ])
+                elif has_location_data and not session_has_location:
+                    # Update existing session with new location data
+                    if session_exists:
+                        # Update existing session - read all rows, update, rewrite
+                        updated_rows = []
+                        with open(SESSIONS_CSV, 'r', encoding='utf-8') as f:
+                            reader = csv.DictReader(f)
+                            for row in reader:
+                                if row['session_id'] == session_id:
+                                    # Update this row with new location data
+                                    row['ip'] = session_ip if session_ip else row.get('ip', '')
+                                    row['city'] = location.get('city', '') if location else row.get('city', '')
+                                    row['region'] = location.get('region', '') if location else row.get('region', '')
+                                    row['country'] = location.get('country', '') if location else row.get('country', '')
+                                    row['country_code'] = location.get('country_code', '') if location else row.get('country_code', '')
+                                    row['latitude'] = str(location.get('latitude', '')) if location else row.get('latitude', '')
+                                    row['longitude'] = str(location.get('longitude', '')) if location else row.get('longitude', '')
+                                    row['timezone'] = location.get('timezone', '') if location else row.get('timezone', '')
+                                updated_rows.append(row)
+                        
+                        # Rewrite CSV with updated data
+                        with open(SESSIONS_CSV, 'w', newline='', encoding='utf-8') as f:
+                            if updated_rows:
+                                writer = csv.DictWriter(f, fieldnames=updated_rows[0].keys())
+                                writer.writeheader()
+                                writer.writerows(updated_rows)
+                    else:
+                        # Add new session
+                        with open(SESSIONS_CSV, 'a', newline='', encoding='utf-8') as f:
+                            writer = csv.writer(f)
+                            writer.writerow([
+                                session_id,
+                                session.get('startTime', ''),
+                                session.get('userAgent', ''),
+                                session.get('screenResolution', ''),
+                                session.get('language', ''),
+                                session.get('referrer', ''),
+                                session_ip,
+                                location.get('city', '') if location else '',
+                                location.get('region', '') if location else '',
+                                location.get('country', '') if location else '',
+                                location.get('country_code', '') if location else '',
+                                str(location.get('latitude', '')) if location else '',
+                                str(location.get('longitude', '')) if location else '',
+                                location.get('timezone', '') if location else ''
+                            ])
+            except OSError as e:
+                print(f"⚠️ Aviso: Não foi possível salvar sessão (provavelmente ambiente read-only): {e}")
         
         # Save event
         if event:
-            with open(EVENTS_CSV, 'a', newline='', encoding='utf-8') as f:
-                writer = csv.writer(f)
-                writer.writerow([
-                    session_id,
-                    event.get('type', ''),
-                    event.get('timestamp', ''),
-                    event.get('page', ''),
-                    json.dumps(event.get('data', {}))
-                ])
+            try:
+                with open(EVENTS_CSV, 'a', newline='', encoding='utf-8') as f:
+                    writer = csv.writer(f)
+                    writer.writerow([
+                        session_id,
+                        event.get('type', ''),
+                        event.get('timestamp', ''),
+                        event.get('page', ''),
+                        json.dumps(event.get('data', {}))
+                    ])
+            except OSError as e:
+                print(f"⚠️ Aviso: Não foi possível salvar evento (provavelmente ambiente read-only): {e}")
         
         return jsonify({'status': 'success'}), 200
     
@@ -694,16 +703,19 @@ def generate_report():
         pdf_data = buffer.getvalue()
         
         # Save hash to tracking data
-        with open(REPORTS_CSV, 'a', newline='', encoding='utf-8') as f:
-            writer = csv.writer(f)
-            writer.writerow([
-                report_hash,
-                session_id,
-                now.isoformat(),
-                user_ip,
-                user_city,
-                json.dumps(priorities)
-            ])
+        try:
+            with open(REPORTS_CSV, 'a', newline='', encoding='utf-8') as f:
+                writer = csv.writer(f)
+                writer.writerow([
+                    report_hash,
+                    session_id,
+                    now.isoformat(),
+                    user_ip,
+                    user_city,
+                    json.dumps(priorities)
+                ])
+        except OSError as e:
+            print(f"⚠️ Aviso: Não foi possível salvar log do relatório (provavelmente ambiente read-only): {e}")
         
         # Send email with PDF in background thread
         import threading
