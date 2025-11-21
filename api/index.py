@@ -106,11 +106,15 @@ def get_location():
         
         # If localhost, try to get public IP from API (without specifying IP)
         if client_ip in ['127.0.0.1', '::1', 'localhost']:
+            print(f"🔍 Detected localhost IP: {client_ip}")
             # For localhost, query API without IP to get server's public IP and location
             try:
+                print("📡 Attempting to fetch public IP from ipapi.co...")
                 response = requests.get('https://ipapi.co/json/', timeout=5)
+                print(f"📡 Response status: {response.status_code}")
                 if response.status_code == 200:
                     data = response.json()
+                    print(f"📡 Response data: {data}")
                     if 'error' not in data and data.get('ip'):
                         return jsonify({
                             'ip': data.get('ip', ''),
@@ -123,17 +127,19 @@ def get_location():
                             'timezone': data.get('timezone', '')
                         }), 200
             except Exception as e:
-                print(f"Erro ao buscar localização pública via API: {e}")
-            # Fallback: return localhost IP
+                print(f"❌ Erro ao buscar localização pública via API: {e}")
+            
+            # Fallback for development: return mock data
+            print("⚠️ Using mock location data for localhost")
             return jsonify({
                 'ip': '127.0.0.1',
-                'city': '',
-                'region': '',
-                'country': '',
-                'country_code': '',
-                'latitude': '',
-                'longitude': '',
-                'timezone': ''
+                'city': 'São Paulo',
+                'region': 'SP',
+                'country': 'Brazil',
+                'country_code': 'BR',
+                'latitude': '-23.5505',
+                'longitude': '-46.6333',
+                'timezone': 'America/Sao_Paulo'
             }), 200
         
         # If we have a real IP, query API with that IP
@@ -387,18 +393,49 @@ def generate_report():
         date_str = now.strftime('%d/%m/%Y')
         time_str = now.strftime('%H:%M:%S')
         
-        # Get user IP and city from session data
-        user_ip = 'N/A'
-        user_city = 'N/A'
+        # Get user IP and city from request data (preferred) or session data (fallback)
+        location_data = data.get('location', {})
+        print(f"📍 Backend received location data: {location_data}")
         
-        if session_id and SESSIONS_CSV.exists():
-            with open(SESSIONS_CSV, 'r', encoding='utf-8') as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    if row['session_id'] == session_id:
-                        user_ip = row.get('ip', 'N/A')
-                        user_city = row.get('city', 'N/A')
-                        break
+        user_ip = location_data.get('ip', 'N/A')
+        user_city = location_data.get('city', 'N/A')
+        user_region = location_data.get('region', 'N/A')
+        user_country = location_data.get('country', 'N/A')
+        
+        print(f"📍 Parsed location - IP: {user_ip}, City: {user_city}, Region: {user_region}, Country: {user_country}")
+        
+        # Fallback to CSV if not provided in request
+        if (user_ip == 'N/A' or user_city == 'N/A') and session_id and SESSIONS_CSV.exists():
+            print(f"⚠️ Location data incomplete, trying CSV fallback for session: {session_id}")
+            try:
+                with open(SESSIONS_CSV, 'r', encoding='utf-8') as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        if row['session_id'] == session_id:
+                            if user_ip == 'N/A': user_ip = row.get('ip', 'N/A')
+                            if user_city == 'N/A': user_city = row.get('city', 'N/A')
+                            if user_region == 'N/A': user_region = row.get('region', 'N/A')
+                            if user_country == 'N/A': user_country = row.get('country', 'N/A')
+                            print(f"📍 CSV fallback - IP: {user_ip}, City: {user_city}, Region: {user_region}, Country: {user_country}")
+                            break
+            except Exception as e:
+                print(f"❌ CSV fallback error: {e}")
+                pass # Ignore CSV errors
+                
+        # Format location string for PDF - IP, City, State
+        location_parts = []
+        if user_ip and user_ip != 'N/A':
+            location_parts.append(f"IP: {user_ip}")
+        if user_city and user_city != 'N/A':
+            location_parts.append(user_city)
+        if user_region and user_region != 'N/A':
+            location_parts.append(user_region)
+        if user_country and user_country != 'N/A':
+            location_parts.append(user_country)
+        
+        location_str = ", ".join(location_parts) if location_parts else "Localização não identificada"
+        print(f"📍 Final location string for PDF: {location_str}")
+
         
         # Generate hash - usa rankingTable para consistência
         hash_data = f"{session_id}{now.isoformat()}{json.dumps(ranking, sort_keys=True)}"
@@ -439,12 +476,7 @@ def generate_report():
         # Hash
         elements.append(Paragraph(f"<b>Hash:</b> {report_hash}", styles['Normal']))
         elements.append(Spacer(1, 6))
-        
-        # IP and City
-        elements.append(Paragraph(
-            f"Requisitado a partir de: {user_ip}, {user_city}",
-            styles['Normal']
-        ))
+        elements.append(Paragraph(f"<b>Requisitado a partir de:</b> {location_str}", styles['Normal']))
         elements.append(Spacer(1, 20))
         
         # Subtitle with priorities - converte r, g, b para percentuais
@@ -848,6 +880,54 @@ Este email contém o relatório PDF em anexo.
         import traceback
         traceback.print_exc()
         raise
+
+@app.route('/api/test-email', methods=['GET'])
+def test_email_endpoint():
+    """Test email configuration"""
+    try:
+        smtp_server = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
+        smtp_port = int(os.getenv('SMTP_PORT', '587'))
+        email_from = os.getenv('EMAIL_FROM', 'noetikaai@gmail.com')
+        email_password = os.getenv('EMAIL_PASSWORD', '')
+        
+        if not email_password:
+            return jsonify({
+                'status': 'error',
+                'message': 'EMAIL_PASSWORD not configured in environment variables'
+            }), 500
+            
+        # Create simple message
+        msg = MIMEMultipart()
+        msg['From'] = email_from
+        msg['To'] = email_from
+        msg['Subject'] = "Teste de Configuração de Email - Tribússola"
+        msg.attach(MIMEText("Se você recebeu este email, a configuração SMTP está correta.", 'plain'))
+        
+        # Try to connect and send
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()
+        server.login(email_from, email_password)
+        server.sendmail(email_from, [email_from], msg.as_string())
+        server.quit()
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'Email de teste enviado com sucesso para {email_from}',
+            'config': {
+                'server': smtp_server,
+                'port': smtp_port,
+                'user': email_from,
+                'password_configured': 'Yes'
+            }
+        }), 200
+        
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'status': 'error',
+            'message': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
 
 if __name__ == '__main__':
     import sys
