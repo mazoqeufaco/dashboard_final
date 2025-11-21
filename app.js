@@ -1,34 +1,34 @@
 import { initEntrada } from './entrada.js';
 
-const IMG_SRC = 'public/triangulo2.png';
+const IMG_SRC = 'triangulo2.png';
 const CSV_ZSCORES = 'data/Matriz de Decisão - Zscores para dash.csv';
-const CSV_NOMES   = 'data/Matriz de Decisão - só nomes e coordenadas.csv';
+const CSV_NOMES = 'data/Matriz de Decisão - só nomes e coordenadas.csv';
 const SOLUTION_DESC = 'solution_description5.json';
 
 let solutionDescriptions = null;
 
 // -------- CSV util --------
-function parseCSV(text){
+function parseCSV(text) {
   // Detecta separador: se tem ; e não tem , fora de aspas, usa ;, senão usa ,
   const hasSemicolon = text.indexOf(';') > -1;
   const hasComma = text.indexOf(',') > -1;
   let sep = (hasSemicolon && !hasComma) ? ';' : ',';
-  
-  const lines = text.replace(/\r/g,'').split('\n').filter(l=>l.trim().length>0);
-  if(!lines.length) return {header:[], rows:[]};
-  
+
+  const lines = text.replace(/\r/g, '').split('\n').filter(l => l.trim().length > 0);
+  if (!lines.length) return { header: [], rows: [] };
+
   // Função para parsear linha CSV respeitando aspas
-  function parseCSVLine(line, separator){
+  function parseCSVLine(line, separator) {
     const result = [];
     let current = '';
     let inQuotes = false;
-    
-    for(let i = 0; i < line.length; i++){
+
+    for (let i = 0; i < line.length; i++) {
       const char = line[i];
       const nextChar = line[i + 1];
-      
-      if(char === '"'){
-        if(inQuotes && nextChar === '"'){
+
+      if (char === '"') {
+        if (inQuotes && nextChar === '"') {
           // Aspas duplas escapadas
           current += '"';
           i++; // Pula o próximo caractere
@@ -36,7 +36,7 @@ function parseCSV(text){
           // Toggle estado de aspas
           inQuotes = !inQuotes;
         }
-      } else if(char === separator && !inQuotes){
+      } else if (char === separator && !inQuotes) {
         // Separador fora de aspas - fim do campo
         result.push(current.trim());
         current = '';
@@ -48,15 +48,15 @@ function parseCSV(text){
     result.push(current.trim());
     return result;
   }
-  
-  const header = parseCSVLine(lines[0], sep).map(h=>h.trim());
+
+  const header = parseCSVLine(lines[0], sep).map(h => h.trim());
   const rows = [];
-  for(let i=1;i<lines.length;i++){
+  for (let i = 1; i < lines.length; i++) {
     const cols = parseCSVLine(lines[i], sep);
-    const o = {}; header.forEach((h,j)=>o[h]=(cols[j]??'').trim());
+    const o = {}; header.forEach((h, j) => o[h] = (cols[j] ?? '').trim());
     rows.push(o);
   }
-  return {header, rows};
+  return { header, rows };
 }
 const coerceNum = s => {
   if (s === null || s === undefined || s === '') return 0;
@@ -66,116 +66,116 @@ const coerceNum = s => {
   return isNaN(num) ? 0 : num;
 };
 
-async function loadCSVs(){
+async function loadCSVs() {
   const [zs, nm] = await Promise.allSettled([
-    fetch(CSV_ZSCORES, {cache:'no-store'}).then(r=>r.text()),
-    fetch(CSV_NOMES,   {cache:'no-store'}).then(r=>r.text())
+    fetch(CSV_ZSCORES, { cache: 'no-store' }).then(r => r.text()),
+    fetch(CSV_NOMES, { cache: 'no-store' }).then(r => r.text())
   ]);
-  const zText = zs.status==='fulfilled' ? zs.value : '';
-  const nText = nm.status==='fulfilled' ? nm.value : '';
+  const zText = zs.status === 'fulfilled' ? zs.value : '';
+  const nText = nm.status === 'fulfilled' ? nm.value : '';
   return { z: parseCSV(zText), n: parseCSV(nText) };
 }
 
-async function loadSolutionDescriptions(){
+async function loadSolutionDescriptions() {
   try {
-    const response = await fetch(SOLUTION_DESC, {cache:'no-store'});
-    if(!response.ok) throw new Error(`Não foi possível carregar ${SOLUTION_DESC}`);
+    const response = await fetch(SOLUTION_DESC, { cache: 'no-store' });
+    if (!response.ok) throw new Error(`Não foi possível carregar ${SOLUTION_DESC}`);
     solutionDescriptions = await response.json();
     return solutionDescriptions;
-  } catch(err) {
+  } catch (err) {
     console.error(`Erro ao carregar ${SOLUTION_DESC}:`, err);
     return null;
   }
 }
 
-function findSolutionById(coordStr){
-  if(!solutionDescriptions || !solutionDescriptions.itens || !coordStr) return null;
-  
+function findSolutionById(coordStr) {
+  if (!solutionDescriptions || !solutionDescriptions.itens || !coordStr) return null;
+
   const normalizedCoord = coordStr.trim();
-  
+
   // 1. Busca exata primeiro
   let solution = solutionDescriptions.itens.find(item => item.id === normalizedCoord);
-  if(solution) return solution;
-  
+  if (solution) return solution;
+
   // 2. Busca case-insensitive
-  solution = solutionDescriptions.itens.find(item => 
+  solution = solutionDescriptions.itens.find(item =>
     item.id.toLowerCase() === normalizedCoord.toLowerCase()
   );
-  if(solution) return solution;
-  
+  if (solution) return solution;
+
   // 3. Tenta variações comuns do formato
   const variations = [
     normalizedCoord,
     normalizedCoord.toLowerCase(),
     normalizedCoord.toUpperCase(),
   ];
-  
+
   // Se termina com número, tenta adicionar .a, .b, .c
-  if(/^[IVXLCDM]+\.\d+$/i.test(normalizedCoord)){
+  if (/^[IVXLCDM]+\.\d+$/i.test(normalizedCoord)) {
     variations.push(
-      `${normalizedCoord}.a`, 
-      `${normalizedCoord}.b`, 
+      `${normalizedCoord}.a`,
+      `${normalizedCoord}.b`,
       `${normalizedCoord}.c`,
       `${normalizedCoord}.d`
     );
   }
-  
+
   // Tenta todas as variações
-  for(const variant of variations){
+  for (const variant of variations) {
     solution = solutionDescriptions.itens.find(item => item.id === variant);
-    if(solution) return solution;
-    
-    solution = solutionDescriptions.itens.find(item => 
+    if (solution) return solution;
+
+    solution = solutionDescriptions.itens.find(item =>
       item.id.toLowerCase() === variant.toLowerCase()
     );
-    if(solution) return solution;
+    if (solution) return solution;
   }
-  
+
   return null;
 }
 
-function findSolutionByName(nome){
-  if(!solutionDescriptions || !solutionDescriptions.itens) return null;
-  return solutionDescriptions.itens.find(item => 
+function findSolutionByName(nome) {
+  if (!solutionDescriptions || !solutionDescriptions.itens) return null;
+  return solutionDescriptions.itens.find(item =>
     item.nome_curto === nome || item.nome === nome
   ) || null;
 }
 
-function formatCurrency(value){
-  if(!value) return 'N/A';
+function formatCurrency(value) {
+  if (!value) return 'N/A';
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 }
 
-function showSolutionModal(solutionName, coordStr){
+function showSolutionModal(solutionName, coordStr) {
   console.log(`🔍 Buscando solução: nome="${solutionName}", coord="${coordStr}"`);
-  
+
   // Prioriza busca por coordenada/ID
   let solution = null;
-  if(coordStr){
+  if (coordStr) {
     solution = findSolutionById(coordStr);
-    if(solution){
+    if (solution) {
       const nomeSol = solution.nome_curto || solution.nome || 'N/A';
       console.log(`✅ Solução encontrada por ID: "${solution.id}" - "${nomeSol}"`);
     }
   }
-  
+
   // Fallback: busca por nome se não encontrou por ID
-  if(!solution){
+  if (!solution) {
     solution = findSolutionByName(solutionName);
-    if(solution){
+    if (solution) {
       const nomeSol = solution.nome_curto || solution.nome || 'N/A';
       console.log(`✅ Solução encontrada por nome: "${nomeSol}"`);
     }
   }
-  
-  if(!solution){
+
+  if (!solution) {
     console.warn(`❌ Solução não encontrada`);
     console.log('   Nome:', solutionName);
     console.log('   Coordenada:', coordStr);
     console.log('💡 Soluções disponíveis:', solutionDescriptions?.itens?.map(i => `${i.id}: ${i.nome_curto || i.nome || 'N/A'}`) || []);
     const modal = document.getElementById('solutionModal');
     const content = document.getElementById('solutionModalContent');
-    if(modal && content){
+    if (modal && content) {
       content.innerHTML = `<p>Informações sobre "${solutionName}" (${coordStr || 'sem coordenada'}) não encontradas.</p>`;
       modal.showModal();
     }
@@ -184,15 +184,15 @@ function showSolutionModal(solutionName, coordStr){
 
   const modal = document.getElementById('solutionModal');
   const content = document.getElementById('solutionModalContent');
-  if(!modal || !content) return;
-  
+  if (!modal || !content) return;
+
   // Mapeia campos do novo formato para compatibilidade
   const nome = solution.nome_curto || solution.nome || 'N/A';
   const tronco = solution.linha || solution.tronco || 'N/A';
   const descricao = solution.descricao_para_leigos || solution.descricao || 'N/A';
   const sinalDados = solution.sinal_dados || '';
   const processamentoDados = solution.processamento_dados || {};
-  
+
   // Monta o HTML do modal
   const html = `
     <div class="solution-header">
@@ -341,40 +341,40 @@ function showSolutionModal(solutionName, coordStr){
   modal.showModal();
 }
 
-function setupSolutionLinks(){
+function setupSolutionLinks() {
   // Intercepta todos os cliques em links de solução
   document.addEventListener('click', (e) => {
     const link = e.target.closest('a');
-    if(!link || !link.href) return;
-    
+    if (!link || !link.href) return;
+
     // Verifica se é um link de detalhe.html ou link de solução
     const href = link.getAttribute('href');
-    if(href && (href.includes('detalhe.html?sol=') || href.includes('?sol='))){
+    if (href && (href.includes('detalhe.html?sol=') || href.includes('?sol='))) {
       e.preventDefault();
       e.stopPropagation();
-      
+
       // Extrai nome e coordenada do link
       let solutionName = '';
       let coordStr = '';
-      
-      if(href.includes('?')){
-      const urlParams = new URLSearchParams(href.split('?')[1]);
+
+      if (href.includes('?')) {
+        const urlParams = new URLSearchParams(href.split('?')[1]);
         solutionName = decodeURIComponent(urlParams.get('sol') || '');
         coordStr = decodeURIComponent(urlParams.get('coord') || '');
       }
-      
+
       // Tenta extrair coordenada do texto do link se não tiver na URL
-      if(!coordStr){
+      if (!coordStr) {
         const coordMatch = link.textContent.match(/\(([IVXLCDM]+\.\d+\.[a-z])\)/i);
-        if(coordMatch) coordStr = coordMatch[1];
+        if (coordMatch) coordStr = coordMatch[1];
       }
-      
+
       // Tenta extrair nome do texto do link se não tiver na URL
-      if(!solutionName){
+      if (!solutionName) {
         solutionName = link.textContent.split('(')[0].trim();
       }
-      
-      if(solutionName || coordStr){
+
+      if (solutionName || coordStr) {
         showSolutionModal(solutionName, coordStr);
       }
     }
@@ -382,70 +382,70 @@ function setupSolutionLinks(){
 }
 
 // -------- helpers de header/coord --------
-function headerLike(header, key){
-  const norm = s => s.toLowerCase().replace(/\s+/g,'');
+function headerLike(header, key) {
+  const norm = s => s.toLowerCase().replace(/\s+/g, '');
   const K = norm(key);
   return header.find(h => norm(h).includes(K));
 }
 
-function parseCoord(s){
-  if(!s) return null;
+function parseCoord(s) {
+  if (!s) return null;
   // Aceita coordenadas com ou sem terceiro nível (ex: "I.1" ou "I.1.a")
   const m = String(s).trim().match(/^([IVXLCDM]+)\s*[\.\-]\s*(\d+)\s*(?:[\.\-]\s*([a-z]))?$/i);
-  if(!m) return null;
-  return { 
-    pri: m[1].toUpperCase(), 
-    sec: parseInt(m[2],10), 
-    ter: (m[3] || '').toLowerCase() 
+  if (!m) return null;
+  return {
+    pri: m[1].toUpperCase(),
+    sec: parseInt(m[2], 10),
+    ter: (m[3] || '').toLowerCase()
   };
 }
-function romanToInt(r){
-  const map={I:1,V:5,X:10,L:50,C:100,D:500,M:1000}; let n=0, prev=0;
-  for(const ch of r.split('').reverse()){ const v=map[ch]||0; if(v<prev) n-=v; else n+=v, prev=v; }
+function romanToInt(r) {
+  const map = { I: 1, V: 5, X: 10, L: 50, C: 100, D: 500, M: 1000 }; let n = 0, prev = 0;
+  for (const ch of r.split('').reverse()) { const v = map[ch] || 0; if (v < prev) n -= v; else n += v, prev = v; }
   return n;
 }
 
 // -------- ranking bruto --------
-function computeRanking(zData, {r,g,b}){
-  const {header, rows} = zData;
-  const ZC = headerLike(header,'zcusto');
-  const ZQ = headerLike(header,'zqual');
-  const ZP = headerLike(header,'zprazo');
-  const sC = headerLike(header,'s_zcusto') || headerLike(header,'szcusto');
-  const sQ = headerLike(header,'s_zqual')  || headerLike(header,'szqual');
-  const sP = headerLike(header,'s_zprazo') || headerLike(header,'szprazo');
-  
-  if(!ZC||!ZQ||!ZP) throw new Error('CSV de Zscores deve ter ZCusto, ZQualidade e ZPrazo.');
-  
+function computeRanking(zData, { r, g, b }) {
+  const { header, rows } = zData;
+  const ZC = headerLike(header, 'zcusto');
+  const ZQ = headerLike(header, 'zqual');
+  const ZP = headerLike(header, 'zprazo');
+  const sC = headerLike(header, 's_zcusto') || headerLike(header, 'szcusto');
+  const sQ = headerLike(header, 's_zqual') || headerLike(header, 'szqual');
+  const sP = headerLike(header, 's_zprazo') || headerLike(header, 'szprazo');
+
+  if (!ZC || !ZQ || !ZP) throw new Error('CSV de Zscores deve ter ZCusto, ZQualidade e ZPrazo.');
+
   // Verifica se temos covariâncias (últimas 3 colunas devem conter "cov" no nome)
   const covCols = header.slice(-3);
-  const hasCovariances = covCols.length === 3 && 
+  const hasCovariances = covCols.length === 3 &&
     covCols.some(col => col.toLowerCase().includes('cov'));
   const hasErrors = sC && sQ && sP;
 
-  const results = rows.map((row, i)=>{
-    const zc=coerceNum(row[ZC]), zq=coerceNum(row[ZQ]), zp=coerceNum(row[ZP]);
-    
+  const results = rows.map((row, i) => {
+    const zc = coerceNum(row[ZC]), zq = coerceNum(row[ZQ]), zp = coerceNum(row[ZP]);
+
     // r, g, b já estão entre 0 e 1 (não percentual) - vem do entrada.js
     // Zranking = (-r*zc) + (g*zq) + (-b*zp)
-    const Zranking = (-r*zc) + (g*zq) + (-b*zp);
-    
+    const Zranking = (-r * zc) + (g * zq) + (-b * zp);
+
     let s_Zrank = 0;
-    
-    if(hasErrors){
-      const sc=coerceNum(row[sC] || 0);
-      const sq=coerceNum(row[sQ] || 0);
-      const sp=coerceNum(row[sP] || 0);
-      
+
+    if (hasErrors) {
+      const sc = coerceNum(row[sC] || 0);
+      const sq = coerceNum(row[sQ] || 0);
+      const sp = coerceNum(row[sP] || 0);
+
       // Validação: valores de erro padrão devem ser razoáveis (0 a 100)
       // Se estiverem muito grandes, pode ser erro de parsing
-      if(sc > 100 || sq > 100 || sp > 100){
-        console.warn(`⚠️ Valores de erro padrão muito grandes na linha ${i+1}: sC=${sc}, sQ=${sq}, sP=${sp}`);
+      if (sc > 100 || sq > 100 || sp > 100) {
+        console.warn(`⚠️ Valores de erro padrão muito grandes na linha ${i + 1}: sC=${sc}, sQ=${sq}, sP=${sp}`);
         console.warn(`   Valores originais: sC="${row[sC]}", sQ="${row[sQ]}", sP="${row[sP]}"`);
         console.warn(`   r=${r}, g=${g}, b=${b} (devem estar entre 0 e 1)`);
       }
-      
-      if(hasCovariances){
+
+      if (hasCovariances) {
         // Fórmula COMPLETA com covariâncias
         // Para Z = -r*C + g*Q - b*P
         // Var(Z) = r²*Var(C) + g²*Var(Q) + b²*Var(P) 
@@ -453,45 +453,45 @@ function computeRanking(zData, {r,g,b}){
         const cov_CQ = coerceNum(row[covCols[0]] || 0);
         const cov_CP = coerceNum(row[covCols[1]] || 0);
         const cov_QP = coerceNum(row[covCols[2]] || 0);
-        
-        const s0_squared = (r*sc)**2 + (g*sq)**2 + (b*sp)**2;
+
+        const s0_squared = (r * sc) ** 2 + (g * sq) ** 2 + (b * sp) ** 2;
         // Correção com covariâncias (não ao quadrado!)
         const correction = 2 * (
-          -r*g * cov_CQ +  // sinal negativo porque -r*C e +g*Q
-          r*b * cov_CP +   // sinal positivo porque -r*C e -b*P
-          -g*b * cov_QP    // sinal negativo porque +g*Q e -b*P
+          -r * g * cov_CQ +  // sinal negativo porque -r*C e +g*Q
+          r * b * cov_CP +   // sinal positivo porque -r*C e -b*P
+          -g * b * cov_QP    // sinal negativo porque +g*Q e -b*P
         );
-        
+
         s_Zrank = Math.sqrt(Math.max(0, s0_squared + correction));
       } else {
         // Fórmula SIMPLES sem covariâncias
         // Var(Z) = r²*Var(C) + g²*Var(Q) + b²*Var(P)
         s_Zrank = Math.sqrt(
-          (r*sc)**2 + 
-          (g*sq)**2 + 
-          (b*sp)**2
+          (r * sc) ** 2 +
+          (g * sq) ** 2 +
+          (b * sp) ** 2
         );
       }
     }
-    
-    return { idx:i, id:(i+1), Zranking, s_Zrank };
+
+    return { idx: i, id: (i + 1), Zranking, s_Zrank };
   });
 
   // Reescalonamento para nota absoluta 0-10 baseado em distribuição gaussiana
   const Z_MIN = -3;
   const Z_MAX = 3;
   const Z_RANGE = Z_MAX - Z_MIN; // 6
-  
+
   // Calcula número de casas decimais baseado no menor erro (2 algarismos significativos)
-  function significativeDecimalPlaces(n){
-    if(n === 0) return 2;
+  function significativeDecimalPlaces(n) {
+    if (n === 0) return 2;
     const absN = Math.abs(n);
-    
+
     // Converte para notação científica para identificar posição do primeiro dígito
     const exp = Math.floor(Math.log10(absN));
-    
+
     // Número de casas decimais para números < 1 é |expoente|, para >= 1 é 2
-    if(exp < 0){
+    if (exp < 0) {
       // Para 0.01 (exp=-2), precisamos de 2 casas
       // Para 0.001 (exp=-3), precisamos de 3 casas
       return Math.abs(exp);
@@ -500,44 +500,44 @@ function computeRanking(zData, {r,g,b}){
       return 2;
     }
   }
-  
+
   const sZValues = results.map(r => r.s_Zrank).filter(e => e > 0);
   // Se não houver erros, usa 2 casas decimais padrão
-  const numDecimals = sZValues.length > 0 
+  const numDecimals = sZValues.length > 0
     ? significativeDecimalPlaces(Math.min(...sZValues))
     : 2;
-  
+
   const processed = results.map(r => {
     // Mapeia de [-3, +3] para [0, 10] - escala absoluta baseada em distribuição gaussiana
     let nota;
-    if(r.Zranking <= Z_MIN) {
+    if (r.Zranking <= Z_MIN) {
       nota = 0; // Zranking <= -3 → nota 0
-    } else if(r.Zranking >= Z_MAX) {
+    } else if (r.Zranking >= Z_MAX) {
       nota = 10; // Zranking >= +3 → nota 10
     } else {
       // Interpolação linear entre -3 e +3
       nota = ((r.Zranking - Z_MIN) / Z_RANGE) * 10;
     }
-    
+
     // Reescalona margem de erro proporcionalmente para a escala 0-10
     const margemErroReescalada = (r.s_Zrank / Z_RANGE) * 10;
     const multiplier = Math.pow(10, numDecimals);
-    return { 
-      ...r, 
+    return {
+      ...r,
       nota: Math.round(nota * multiplier) / multiplier,
       margemErro: Math.round(margemErroReescalada * multiplier) / multiplier
     };
   });
-  
+
   // Retorna os resultados junto com o número de casas decimais
   return { items: processed, decimals: numDecimals };
 }
 
 // -------- enriquece com nomes/coords --------
-function enrichWithNames(rows, namesParsed){
-  const nameCol  = headerLike(namesParsed.header, 'nome') || namesParsed.header[0];
-  const coordCol = headerLike(namesParsed.header, 'coordenadas') || headerLike(namesParsed.header,'coord');
-  return rows.map(r=>{
+function enrichWithNames(rows, namesParsed) {
+  const nameCol = headerLike(namesParsed.header, 'nome') || namesParsed.header[0];
+  const coordCol = headerLike(namesParsed.header, 'coordenadas') || headerLike(namesParsed.header, 'coord');
+  return rows.map(r => {
     const nome = namesParsed.rows[r.idx]?.[nameCol] ?? `Sol ${r.id}`;
     let coordStr = namesParsed.rows[r.idx]?.[coordCol] ?? '';
     const coordOriginal = coordStr;
@@ -549,55 +549,55 @@ function enrichWithNames(rows, namesParsed){
 }
 
 // -------- Clustering GMM simplificado --------
-function gmmCluster(items, maxComponents = 8){
-  if(items.length <= 1) return items.map((item, i) => ({...item, cluster: 1}));
-  if(items.length <= 3) return items.map((item, i) => ({...item, cluster: i+1}));
-  
+function gmmCluster(items, maxComponents = 8) {
+  if (items.length <= 1) return items.map((item, i) => ({ ...item, cluster: 1 }));
+  if (items.length <= 3) return items.map((item, i) => ({ ...item, cluster: i + 1 }));
+
   const x = items.map(item => item.nota);
   const n = x.length;
-  
-  function findOptimalK(data, maxK){
-    if(data.length <= maxK) return Math.min(3, data.length);
-    
-    const sorted = [...data].sort((a,b) => a - b);
+
+  function findOptimalK(data, maxK) {
+    if (data.length <= maxK) return Math.min(3, data.length);
+
+    const sorted = [...data].sort((a, b) => a - b);
     const bics = [];
-    
-    for(let k = 1; k <= Math.min(maxK, n-1); k++){
+
+    for (let k = 1; k <= Math.min(maxK, n - 1); k++) {
       const centroids = kmeansInit(sorted, k);
       const labels = assignClusters(sorted, centroids);
       const bic = calculateBIC(sorted, labels, k);
       bics.push(bic);
     }
-    
+
     let optimalK = 1;
     let minBIC = bics[0];
-    for(let i = 1; i < bics.length; i++){
-      if(bics[i] < minBIC){
+    for (let i = 1; i < bics.length; i++) {
+      if (bics[i] < minBIC) {
         minBIC = bics[i];
         optimalK = i + 1;
       }
     }
-    
+
     return optimalK;
   }
-  
-  function kmeansInit(data, k){
+
+  function kmeansInit(data, k) {
     const min = Math.min(...data);
     const max = Math.max(...data);
     const centroids = [];
-    for(let i = 0; i < k; i++){
+    for (let i = 0; i < k; i++) {
       centroids.push(min + (max - min) * (i + 0.5) / k);
     }
     return centroids;
   }
-  
-  function assignClusters(data, centroids){
+
+  function assignClusters(data, centroids) {
     return data.map(x => {
       let minDist = Infinity;
       let cluster = 0;
       centroids.forEach((c, i) => {
         const dist = Math.abs(x - c);
-        if(dist < minDist){
+        if (dist < minDist) {
           minDist = dist;
           cluster = i;
         }
@@ -605,103 +605,103 @@ function gmmCluster(items, maxComponents = 8){
       return cluster;
     });
   }
-  
-  function calculateBIC(data, labels, k){
+
+  function calculateBIC(data, labels, k) {
     const n = data.length;
-    if(k === 1){
-      const mean = data.reduce((a,b) => a+b, 0) / n;
-      const variance = data.reduce((sum, x) => sum + (x - mean)**2, 0) / n;
+    if (k === 1) {
+      const mean = data.reduce((a, b) => a + b, 0) / n;
+      const variance = data.reduce((sum, x) => sum + (x - mean) ** 2, 0) / n;
       const logLikelihood = -n * 0.5 * Math.log(2 * Math.PI * variance) - n / 2;
       return -2 * logLikelihood + k * Math.log(n);
     }
-    
+
     const clusters = {};
     labels.forEach((label, i) => {
-      if(!clusters[label]) clusters[label] = [];
+      if (!clusters[label]) clusters[label] = [];
       clusters[label].push(data[i]);
     });
-    
+
     let logLikelihood = 0;
     Object.values(clusters).forEach(cluster => {
-      if(cluster.length === 0) return;
-      const mean = cluster.reduce((a,b) => a+b, 0) / cluster.length;
-      const variance = cluster.reduce((sum, x) => sum + (x - mean)**2, 0) / cluster.length || 0.001;
+      if (cluster.length === 0) return;
+      const mean = cluster.reduce((a, b) => a + b, 0) / cluster.length;
+      const variance = cluster.reduce((sum, x) => sum + (x - mean) ** 2, 0) / cluster.length || 0.001;
       logLikelihood -= cluster.length * 0.5 * Math.log(2 * Math.PI * variance);
-      logLikelihood -= cluster.reduce((sum, x) => sum + (x - mean)**2, 0) / (2 * variance);
+      logLikelihood -= cluster.reduce((sum, x) => sum + (x - mean) ** 2, 0) / (2 * variance);
     });
-    
+
     return -2 * logLikelihood + k * Math.log(n);
   }
-  
+
   const optimalK = findOptimalK(x, maxComponents);
   const centroids = kmeansInit(x, optimalK);
-  
-  const sorted = [...items].sort((a,b) => b.nota - a.nota);
+
+  const sorted = [...items].sort((a, b) => b.nota - a.nota);
   const sortedX = sorted.map(item => item.nota);
   const labels = assignClusters(sortedX, centroids);
-  
-  const uniqueLabels = [...new Set(labels)].sort((a,b) => {
-    const meanA = sortedX.filter((_, i) => labels[i] === a).reduce((s,x) => s+x, 0) / labels.filter(l => l === a).length;
-    const meanB = sortedX.filter((_, i) => labels[i] === b).reduce((s,x) => s+x, 0) / labels.filter(l => l === b).length;
+
+  const uniqueLabels = [...new Set(labels)].sort((a, b) => {
+    const meanA = sortedX.filter((_, i) => labels[i] === a).reduce((s, x) => s + x, 0) / labels.filter(l => l === a).length;
+    const meanB = sortedX.filter((_, i) => labels[i] === b).reduce((s, x) => s + x, 0) / labels.filter(l => l === b).length;
     return meanB - meanA;
   });
-  
+
   const labelMap = {};
   uniqueLabels.forEach((oldLabel, i) => {
     labelMap[oldLabel] = i + 1;
   });
-  
+
   return sorted.map((item, i) => ({
     ...item,
     cluster: labelMap[labels[i]]
   }));
 }
 
-function smartCluster(items){
+function smartCluster(items) {
   return gmmCluster(items, 8);
 }
 
 // -------- Nomes dos clusters --------
-function getClusterName(clusterId, totalClusters){
+function getClusterName(clusterId, totalClusters) {
   const names = ['Ouro', 'Prata', 'Bronze', 'Ferro', 'Barro', 'Lama', 'Nem Olhe', 'Olhe Menos'];
-  if(!clusterId || isNaN(clusterId) || clusterId < 1) return 'N/A';
-  if(clusterId <= names.length && clusterId > 0) return names[clusterId - 1];
+  if (!clusterId || isNaN(clusterId) || clusterId < 1) return 'N/A';
+  if (clusterId <= names.length && clusterId > 0) return names[clusterId - 1];
   return `Cluster ${clusterId}`;
 }
 
 // -------- PÓDIO por cluster --------
-function renderPodiumClusters(items, decimals){
+function renderPodiumClusters(items, decimals) {
   const host = document.getElementById('podium');
-  if(!host) return;
+  if (!host) return;
 
   // Aplica clustering inteligente
   const clustered = smartCluster(items);
-  
+
   // Agrupa por cluster
   const clusters = new Map();
-  for(const item of clustered){
+  for (const item of clustered) {
     const cid = item.cluster;
-    if(!clusters.has(cid)) clusters.set(cid, { maxNota: -Infinity, items: [] });
+    if (!clusters.has(cid)) clusters.set(cid, { maxNota: -Infinity, items: [] });
     const c = clusters.get(cid);
     c.items.push(item);
-    if(item.nota > c.maxNota) c.maxNota = item.nota;
+    if (item.nota > c.maxNota) c.maxNota = item.nota;
   }
-  
+
   // Ordena clusters pela melhor nota
-  const ordered = [...clusters.entries()].sort((a,b)=> b[1].maxNota - a[1].maxNota);
+  const ordered = [...clusters.entries()].sort((a, b) => b[1].maxNota - a[1].maxNota);
   const totalClusters = ordered.length;
-  const displayClusters = ordered.slice(0,3);
+  const displayClusters = ordered.slice(0, 3);
 
-  const medals = ['🥇','🥈','🥉','🏅','🏅','🏅','🏅','🏅'];
-  const classes = ['medal-1','medal-2','medal-3','medal-4','medal-5','medal-6','medal-7','medal-8'];
+  const medals = ['🥇', '🥈', '🥉', '🏅', '🏅', '🏅', '🏅', '🏅'];
+  const classes = ['medal-1', 'medal-2', 'medal-3', 'medal-4', 'medal-5', 'medal-6', 'medal-7', 'medal-8'];
 
-  const cards = displayClusters.map(([cid, group], i)=>{
-    group.items.sort((a,b)=> b.nota - a.nota);
+  const cards = displayClusters.map(([cid, group], i) => {
+    group.items.sort((a, b) => b.nota - a.nota);
     const topItems = group.items;
-    const links = topItems.map(it=>{
+    const links = topItems.map(it => {
       const label = `${it.nome} (${it.coordStr || ''})`;
       const coord = it.coordStr || '';
-      const href  = `detalhe.html?sol=${encodeURIComponent(it.nome)}&coord=${encodeURIComponent(coord)}`;
+      const href = `detalhe.html?sol=${encodeURIComponent(it.nome)}&coord=${encodeURIComponent(coord)}`;
       return `<a class="podium-link" href="${href}">${label}</a>`;
     }).join('');
     const best = group.items[0];
@@ -719,38 +719,38 @@ function renderPodiumClusters(items, decimals){
 }
 
 // -------- Tabela (ranking completo) --------
-function renderTable(items, decimals, priorities){
+function renderTable(items, decimals, priorities) {
   const host = document.getElementById('table');
-  if(!items?.length){ host.innerHTML = '<em>Nenhum resultado.</em>'; return; }
-  
+  if (!items?.length) { host.innerHTML = '<em>Nenhum resultado.</em>'; return; }
+
   // Aplica clustering e ordena por nota
   const clustered = smartCluster(items);
-  const sorted = clustered.sort((a,b) => b.nota - a.nota);
-  
+  const sorted = clustered.sort((a, b) => b.nota - a.nota);
+
   const head = `<thead><tr><th>#</th><th>Cluster</th><th>Nome</th><th class="num">Nota</th><th class="num">Margem de Erro</th></tr></thead>`;
-  const body = sorted.map((r,i)=>{
+  const body = sorted.map((r, i) => {
     const coord = r.coordStr || '';
     const href = `detalhe.html?sol=${encodeURIComponent(r.nome)}&coord=${encodeURIComponent(coord)}`;
     const clusterName = getClusterName(r.cluster, Math.max(...clustered.map(x => x.cluster)));
     return `<tr>
-      <td>${i+1}</td>
+      <td>${i + 1}</td>
       <td><span class="cluster-badge cluster-${r.cluster}">${clusterName}</span></td>
-      <td><a href="${href}">${r.nome} ${r.coordStr?`(${r.coordStr})`:''}</a></td>
+      <td><a href="${href}">${r.nome} ${r.coordStr ? `(${r.coordStr})` : ''}</a></td>
       <td class="num">${r.nota.toFixed(decimals)}</td>
       <td class="num">${r.margemErro.toFixed(decimals)}</td>
     </tr>`;
   }).join('');
   host.innerHTML = `<table class="table">${head}<tbody>${body}</tbody></table>`;
-  
+
   // Renderiza gráfico de clusters
   renderClusterPlot(clustered, decimals, priorities);
 }
 
 // -------- Gráfico de clusters 1D --------
-function renderClusterPlot(items, decimals, priorities){
+function renderClusterPlot(items, decimals, priorities) {
   const host = document.getElementById('clusterPlot');
-  if(!host || !items?.length) return;
-  
+  if (!host || !items?.length) return;
+
   const canvas = document.createElement('canvas');
   canvas.width = 1000;
   canvas.height = 380;
@@ -761,38 +761,38 @@ function renderClusterPlot(items, decimals, priorities){
   canvas.style.border = '1px solid #222';
   canvas.style.borderRadius = '12px';
   canvas.style.marginTop = '16px';
-  
+
   const ctx = canvas.getContext('2d');
   const width = canvas.width;
   const height = canvas.height;
   const padding = { top: 90, right: 40, bottom: 55, left: 70 };
   const plotWidth = width - padding.left - padding.right;
   const plotHeight = height - padding.top - padding.bottom;
-  
-  const sorted = [...items].sort((a,b) => b.nota - a.nota);
+
+  const sorted = [...items].sort((a, b) => b.nota - a.nota);
   const y = sorted.map(item => item.nota);
   const x = sorted.map((item, idx) => idx + 1);
   const clusters = sorted.map(item => item.cluster);
-  
+
   const minY = 0;
   const maxY = 10;
   const rangeY = 10;
   const maxX = sorted.length;
-  
+
   const colors = [
-    '#ffd700', '#c0c0c0', '#cd7f32', '#708090', 
+    '#ffd700', '#c0c0c0', '#cd7f32', '#708090',
     '#8b4513', '#654321', '#2F4F2F', '#1c1c1c'
   ];
-  
+
   ctx.fillStyle = '#0e0e0e';
   ctx.fillRect(0, 0, width, height);
-  
+
   ctx.fillStyle = '#cfcfcf';
   ctx.font = 'bold 16px system-ui, sans-serif';
   ctx.textAlign = 'center';
   ctx.fillText('Nota x Classificação', width / 2, 22);
-  
-  if(priorities){
+
+  if (priorities) {
     const rPct = (priorities.r * 100).toFixed(1);
     const gPct = (priorities.g * 100).toFixed(1);
     const bPct = (priorities.b * 100).toFixed(1);
@@ -800,17 +800,17 @@ function renderClusterPlot(items, decimals, priorities){
     ctx.font = '13px system-ui, sans-serif';
     ctx.fillText(`com prioridades em: ${rPct}% Custo, ${gPct}% Qualidade e ${bPct}% Prazo`, width / 2, 42);
   }
-  
+
   const maxCluster = Math.max(...clusters);
-  function drawMarker(ctx, x, y, clusterId, color){
+  function drawMarker(ctx, x, y, clusterId, color) {
     const name = getClusterName(clusterId, maxCluster);
-    if(name === 'Ferro' || name === 'Barro'){
+    if (name === 'Ferro' || name === 'Barro') {
       ctx.fillStyle = color;
       ctx.fillRect(x - 5, y - 5, 10, 10);
       ctx.strokeStyle = '#000';
       ctx.lineWidth = 0.5;
       ctx.strokeRect(x - 5, y - 5, 10, 10);
-    } else if(name === 'Lama' || name === 'Nem Olhe' || name === 'Olhe Menos'){
+    } else if (name === 'Lama' || name === 'Nem Olhe' || name === 'Olhe Menos') {
       ctx.strokeStyle = color;
       ctx.lineWidth = 2;
       ctx.beginPath();
@@ -829,20 +829,20 @@ function renderClusterPlot(items, decimals, priorities){
       ctx.stroke();
     }
   }
-  
-  const uniqueClusters = [...new Set(clusters)].sort((a,b) => a - b);
+
+  const uniqueClusters = [...new Set(clusters)].sort((a, b) => a - b);
   ctx.globalAlpha = 1;
-  
+
   ctx.fillStyle = '#cfcfcf';
   ctx.font = 'bold 12px system-ui, sans-serif';
   ctx.textAlign = 'left';
   ctx.fillText('Legenda:', padding.left, 60);
-  
+
   ctx.font = '11px system-ui, sans-serif';
   let legendX = padding.left;
   let legendY = 75;
   let maxLegendY = legendY;
-  
+
   uniqueClusters.forEach(clusterId => {
     const color = clusterId <= colors.length ? colors[clusterId - 1] : '#888';
     const name = getClusterName(clusterId, maxCluster);
@@ -850,21 +850,21 @@ function renderClusterPlot(items, decimals, priorities){
     ctx.fillStyle = '#eaeaea';
     ctx.fillText(name, legendX + 14, legendY + 4);
     legendX += 85;
-    if(legendX > width - 100){
+    if (legendX > width - 100) {
       legendX = padding.left;
       legendY += 20;
     }
     maxLegendY = Math.max(maxLegendY, legendY + 12);
   });
-  
+
   const legendHeight = maxLegendY - 60;
   const spaceAfterLegend = 15;
   const adjustedPaddingTop = maxLegendY + spaceAfterLegend;
   const adjustedPlotHeight = height - adjustedPaddingTop - padding.bottom;
-  
+
   ctx.strokeStyle = '#2a2a2a';
   ctx.lineWidth = 1;
-  for(let i = 0; i <= 10; i++){
+  for (let i = 0; i <= 10; i++) {
     const value = i;
     const yPos = adjustedPaddingTop + adjustedPlotHeight - ((value / 10) * adjustedPlotHeight);
     ctx.beginPath();
@@ -872,25 +872,25 @@ function renderClusterPlot(items, decimals, priorities){
     ctx.lineTo(padding.left + plotWidth, yPos);
     ctx.stroke();
   }
-  
+
   const numTicks = Math.min(20, maxX);
-  for(let i = 0; i <= numTicks; i++){
+  for (let i = 0; i <= numTicks; i++) {
     const xPos = padding.left + (plotWidth * i / numTicks);
     ctx.beginPath();
     ctx.moveTo(xPos, adjustedPaddingTop);
     ctx.lineTo(xPos, adjustedPaddingTop + adjustedPlotHeight);
     ctx.stroke();
   }
-  
+
   ctx.fillStyle = '#b8b8b8';
   ctx.font = 'bold 13px system-ui, sans-serif';
   ctx.textAlign = 'right';
-  for(let i = 0; i <= 10; i++){
+  for (let i = 0; i <= 10; i++) {
     const value = i;
     const yPos = adjustedPaddingTop + adjustedPlotHeight - ((value / 10) * adjustedPlotHeight);
     ctx.fillText(value.toFixed(decimals), padding.left - 12, yPos + 5);
   }
-  
+
   ctx.fillStyle = '#eaeaea';
   ctx.font = 'bold 14px system-ui, sans-serif';
   ctx.save();
@@ -899,21 +899,21 @@ function renderClusterPlot(items, decimals, priorities){
   ctx.textAlign = 'center';
   ctx.fillText('Nota', 0, 0);
   ctx.restore();
-  
+
   ctx.fillStyle = '#b8b8b8';
   ctx.font = 'bold 13px system-ui, sans-serif';
   ctx.textAlign = 'center';
   const tickStep = Math.max(1, Math.floor(maxX / 20));
-  for(let i = 0; i <= maxX; i += tickStep){
+  for (let i = 0; i <= maxX; i += tickStep) {
     const xPos = padding.left + ((i / maxX) * plotWidth);
     ctx.fillText(i.toString(), xPos, height - 20);
   }
-  
+
   ctx.fillStyle = '#eaeaea';
   ctx.font = 'bold 14px system-ui, sans-serif';
   ctx.textAlign = 'center';
   ctx.fillText('Classificação', width / 2, height - 8);
-  
+
   sorted.forEach((item, i) => {
     const clusterId = item.cluster;
     const xValue = i + 1;
@@ -921,9 +921,9 @@ function renderClusterPlot(items, decimals, priorities){
     const xPos = padding.left + ((xValue / maxX) * plotWidth);
     const yPos = adjustedPaddingTop + adjustedPlotHeight - ((yValue / 10) * adjustedPlotHeight);
     const color = clusterId <= colors.length ? colors[clusterId - 1] : '#888';
-    
+
     const error = item.margemErro || 0;
-    if(error > 0){
+    if (error > 0) {
       const errorHeight = (error / 10) * adjustedPlotHeight;
       ctx.strokeStyle = color;
       ctx.lineWidth = 1.5;
@@ -942,11 +942,11 @@ function renderClusterPlot(items, decimals, priorities){
       ctx.lineTo(xPos + 3, yPos + errorHeight);
       ctx.stroke();
     }
-    
+
     ctx.globalAlpha = 0.9;
     drawMarker(ctx, xPos, yPos, clusterId, color);
   });
-  
+
   host.innerHTML = '';
   host.appendChild(canvas);
 }
@@ -967,16 +967,16 @@ async function generateReport() {
     if (!clusterPlotHost?.querySelector('canvas')) {
       renderClusterPlot(currentRankingData.items, currentRankingData.decimals, currentPriorities);
     }
-    
+
     const canvas = clusterPlotHost?.querySelector('canvas');
     let graphImage = null;
-    
+
     if (canvas) {
       try {
         // Tenta obter a imagem do canvas
         // Alguns navegadores podem ter problemas com CORS ou canvas "tainted"
-      graphImage = canvas.toDataURL('image/png');
-        
+        graphImage = canvas.toDataURL('image/png');
+
         // Valida se a imagem foi gerada corretamente
         if (!graphImage || graphImage.length < 100) {
           console.warn('Imagem do gráfico muito pequena ou inválida');
@@ -1022,39 +1022,39 @@ async function generateReport() {
         margemErro: item.margemErro.toFixed(currentRankingData.decimals)
       };
     });
-    
+
     let clustered = currentRankingData.items;
-    if(!currentRankingData.items[0]?.cluster) {
+    if (!currentRankingData.items[0]?.cluster) {
       clustered = smartCluster(currentRankingData.items);
     }
-    
+
     const clusters = new Map();
-    for(const item of clustered){
+    for (const item of clustered) {
       const cid = item.cluster;
-      if(cid != null && !isNaN(cid) && cid > 0) {
-        if(!clusters.has(cid)) clusters.set(cid, { maxNota: -Infinity, items: [] });
+      if (cid != null && !isNaN(cid) && cid > 0) {
+        if (!clusters.has(cid)) clusters.set(cid, { maxNota: -Infinity, items: [] });
         const c = clusters.get(cid);
         c.items.push(item);
-        if(item.nota > c.maxNota) c.maxNota = item.nota;
+        if (item.nota > c.maxNota) c.maxNota = item.nota;
       }
     }
-    const ordered = [...clusters.entries()].sort((a,b)=> b[1].maxNota - a[1].maxNota);
+    const ordered = [...clusters.entries()].sort((a, b) => b[1].maxNota - a[1].maxNota);
     const podiumClusters = ordered.slice(0, 3);
-    
+
     const podiumData = podiumClusters.map(([cid, group], index) => {
-      group.items.sort((a,b)=> b.nota - a.nota);
+      group.items.sort((a, b) => b.nota - a.nota);
       const clusterName = cid ? getClusterName(cid, ordered.length) : 'N/A';
       return {
         categoria: clusterName,
         items: group.items.map(item => {
           let solutionInfo = null;
-          if(item.coordStr) {
+          if (item.coordStr) {
             solutionInfo = findSolutionById(item.coordStr);
           }
-          if(!solutionInfo && item.nome) {
+          if (!solutionInfo && item.nome) {
             solutionInfo = findSolutionByName(item.nome);
           }
-          
+
           return {
             nome: item.nome,
             coord: item.coordStr || '',
@@ -1075,10 +1075,10 @@ async function generateReport() {
     const bPct = (currentPriorities.b * 100).toFixed(1);
 
     // Obtém sessionId do tracking (tracking.js deve estar carregado antes)
-    const sessionId = (typeof trackingSession !== 'undefined' && trackingSession?.sessionId) 
-      ? trackingSession.sessionId 
+    const sessionId = (typeof trackingSession !== 'undefined' && trackingSession?.sessionId)
+      ? trackingSession.sessionId
       : (window.trackingSession?.sessionId || '');
-    
+
     const response = await fetch('/api/generate-report', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1100,15 +1100,15 @@ async function generateReport() {
     }
 
     const blob = await response.blob();
-    
+
     // Compatibilidade com navegadores antigos
     const URL = window.URL || window.webkitURL || window;
     const url = URL.createObjectURL ? URL.createObjectURL(blob) : null;
-    
+
     if (!url) {
       // Fallback para navegadores muito antigos - abre em nova janela
       const reader = new FileReader();
-      reader.onload = function(e) {
+      reader.onload = function (e) {
         const newWindow = window.open();
         if (newWindow) {
           newWindow.document.write('<iframe src="' + e.target.result + '" style="width:100%;height:100%;border:none;"></iframe>');
@@ -1119,30 +1119,30 @@ async function generateReport() {
       reader.readAsDataURL(blob);
       return;
     }
-    
+
     const a = document.createElement('a');
     a.href = url;
     a.download = `Tribussula_report_${new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)}.pdf`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    
+
     // Revoga URL após um delay para garantir que o download iniciou
-    setTimeout(function() {
+    setTimeout(function () {
       if (URL.revokeObjectURL) {
         URL.revokeObjectURL(url);
       }
     }, 100);
   } catch (err) {
     console.error('Erro ao gerar relatório:', err);
-    
+
     // Se for erro 502 (Bad Gateway), o backend não está disponível
     if (err.message && err.message.includes('502')) {
       alert('Backend não está disponível. A geração de relatório requer o servidor backend em execução.\n\n' +
-            'Em produção, certifique-se de que o backend Python está rodando corretamente.');
+        'Em produção, certifique-se de que o backend Python está rodando corretamente.');
     } else {
       alert('Erro ao gerar relatório. Verifique o console para mais detalhes.\n\n' +
-            'Erro: ' + err.message);
+        'Erro: ' + err.message);
     }
   }
 }
@@ -1162,31 +1162,31 @@ const BRANCH_LABELS = {
 // parseCoord já existe acima, não duplicar
 
 // Função para comparar coordenadas
-function compareCoords(a,b){
-  if(a.pri!==b.pri) return romanToInt(a.pri)-romanToInt(b.pri);
-  if(a.sec!==b.sec) return a.sec-b.sec;
+function compareCoords(a, b) {
+  if (a.pri !== b.pri) return romanToInt(a.pri) - romanToInt(b.pri);
+  if (a.sec !== b.sec) return a.sec - b.sec;
   return a.ter.localeCompare(b.ter);
 }
 
-function buildTree(items){
+function buildTree(items) {
   // Formato: Map(pri -> Map(sec -> [leaves]))
   const tree = new Map();
-  for(const it of items){
-    if(!it.coordStr) continue;
+  for (const it of items) {
+    if (!it.coordStr) continue;
     const coord = parseCoord(it.coordStr);
-    if(!coord) continue;
-    
+    if (!coord) continue;
+
     const p = coord.pri, s = coord.sec;
-    if(!tree.has(p)) tree.set(p, new Map());
+    if (!tree.has(p)) tree.set(p, new Map());
     const sec = tree.get(p);
-    if(!sec.has(s)) sec.set(s, []);
-    sec.get(s).push({...it, coord});
+    if (!sec.has(s)) sec.set(s, []);
+    sec.get(s).push({ ...it, coord });
   }
-  
+
   // Ordena internamente
-  for(const [,sec] of tree){
-    for(const [s,arr] of sec){
-      arr.sort((a,b)=> compareCoords(a.coord,b.coord) || (b.nota - a.nota));
+  for (const [, sec] of tree) {
+    for (const [s, arr] of sec) {
+      arr.sort((a, b) => compareCoords(a.coord, b.coord) || (b.nota - a.nota));
       sec.set(s, arr);
     }
   }
@@ -1194,28 +1194,28 @@ function buildTree(items){
 }
 
 // Função auxiliar para gerar label de ramo secundário baseado nos dados
-function generateSecondaryLabel(pri, sec, leaves){
+function generateSecondaryLabel(pri, sec, leaves) {
   // Para ramo I (Soluções prontas), usa apenas o número (ex: "1")
-  if(pri === 'I') {
+  if (pri === 'I') {
     return String(sec);
   }
-  
+
   // Para ramos conhecidos, usa labels descritivos
-  if(pri === 'II' && sec === 1) return 'sem anonimização';
-  if(pri === 'II' && sec === 2) return 'com anonimização';
-  if(pri === 'III' && sec === 1) return 'sem engenharia reversa';
-  if(pri === 'III' && sec === 2) return 'com engenharia reversa';
-  
+  if (pri === 'II' && sec === 1) return 'sem anonimização';
+  if (pri === 'II' && sec === 2) return 'com anonimização';
+  if (pri === 'III' && sec === 1) return 'sem engenharia reversa';
+  if (pri === 'III' && sec === 2) return 'com engenharia reversa';
+
   // Fallback: usa apenas o número
   return String(sec);
 }
 
-function renderTree(tree, decimals){
+function renderTree(tree, decimals) {
   const host = document.getElementById('tree');
-  if(!host){ return; }
-  if(!tree || tree.size === 0){ 
-    host.innerHTML='<em>Nenhuma solução mapeada.</em>'; 
-    return; 
+  if (!host) { return; }
+  if (!tree || tree.size === 0) {
+    host.innerHTML = '<em>Nenhuma solução mapeada.</em>';
+    return;
   }
 
   // Cria SVG para renderizar a árvore em formato de mind-map
@@ -1225,15 +1225,15 @@ function renderTree(tree, decimals){
   svg.style.background = '#0a0a0a';
   svg.style.borderRadius = '12px';
   svg.style.overflow = 'visible';
-  
+
   // Limpa o host
   host.innerHTML = '';
   host.appendChild(svg);
-  
+
   // Estrutura de nós para posicionamento
   const nodes = [];
   const links = [];
-  
+
   // Nó raiz: "seu problema" - posição baseada no código React
   const rootNode = {
     id: 'root',
@@ -1243,22 +1243,22 @@ function renderTree(tree, decimals){
     type: 'root'
   };
   nodes.push(rootNode);
-  
+
   // Calcula posições baseado na estrutura hierárquica (baseado no código React)
-  const primKeys = [...tree.keys()].sort((a,b)=> romanToInt(a)-romanToInt(b));
-  
+  const primKeys = [...tree.keys()].sort((a, b) => romanToInt(a) - romanToInt(b));
+
   // Posições fixas baseadas no código React
   const branchPositions = {
     'I': { x: 500, y: 200 },
     'II': { x: 500, y: 400 },
     'III': { x: 500, y: 600 }
   };
-  
+
   primKeys.forEach((pri, priIdx) => {
     const secs = tree.get(pri);
-    const secKeys = [...secs.keys()].sort((a,b)=> a-b);
+    const secKeys = [...secs.keys()].sort((a, b) => a - b);
     const branchLabel = BRANCH_LABELS[pri] || pri;
-    
+
     // Posição do branch principal (baseada no código React)
     const branchPos = branchPositions[pri] || { x: 500, y: 200 + priIdx * 200 };
     const branchNode = {
@@ -1271,28 +1271,28 @@ function renderTree(tree, decimals){
     };
     nodes.push(branchNode);
     links.push({ from: rootNode.id, to: branchNode.id });
-    
+
     // Se não tem secundários (ramo I), coloca soluções diretas
-    if(secKeys.length === 0) return;
-    
+    if (secKeys.length === 0) return;
+
     // Posiciona nós secundários e soluções
     secKeys.forEach((sec, secIdx) => {
       const leaves = secs.get(sec);
       const secLabel = generateSecondaryLabel(pri, sec, leaves);
-      
+
       // Posição do nó secundário (baseada no código React)
       let secX = 750;
       let secY;
-      
-      if(pri === 'II') {
+
+      if (pri === 'II') {
         secY = sec === 1 ? 350 : 480;
-      } else if(pri === 'III') {
+      } else if (pri === 'III') {
         secY = sec === 1 ? 580 : 680;
       } else {
         // Fallback: distribui verticalmente
         secY = branchPos.y + (secIdx - (secKeys.length - 1) / 2) * 60;
       }
-      
+
       const secNode = {
         id: `sec-${pri}-${sec}`,
         label: secLabel,
@@ -1304,19 +1304,19 @@ function renderTree(tree, decimals){
       };
       nodes.push(secNode);
       links.push({ from: branchNode.id, to: secNode.id });
-      
+
       // Posiciona soluções à direita, verticalmente distribuídas
       leaves.forEach((leaf, leafIdx) => {
         const coordStr = leaf.coordStr || '';
         let displayName = leaf.nome;
-        if(displayName.length > 35){
+        if (displayName.length > 35) {
           displayName = displayName.substring(0, 32) + '...';
         }
-        
+
         // Distribui soluções verticalmente em torno do nó secundário
         const solutionY = secY + (leafIdx - (leaves.length - 1) / 2) * 35;
         const solutionX = 1000; // Posição fixa à direita (baseado no código React)
-        
+
         const solutionNode = {
           id: `sol-${coordStr}-${leafIdx}`,
           label: `${displayName} (${coordStr})`,
@@ -1332,43 +1332,43 @@ function renderTree(tree, decimals){
       });
     });
   });
-  
+
   // Função para desenhar curva bezier no estilo da imagem, evitando cruzamentos
   function drawCurve(x1, y1, x2, y2, color = '#555', width = 2, positionOffset = 0) {
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    
+
     const dx = x2 - x1;
     const dy = y2 - y1;
-    
+
     // Calcula offset baseado na direção vertical
     // A curva deve se projetar para FORA da linha reta entre os pontos
     // Se a linha vai para baixo (y2 > y1), a curva deve se projetar para baixo (offset positivo)
     // Se a linha vai para cima (y2 < y1), a curva deve se projetar para cima (offset negativo)
     const baseOffset = Math.abs(dy) * 0.3; // 30% da distância vertical (reduzido para evitar cruzamentos)
-    
+
     // Determina direção do offset baseado na direção da linha
     let offsetDirection;
-    if(Math.abs(dy) < 5) {
+    if (Math.abs(dy) < 5) {
       // Linha quase horizontal - usa offset de posição
       offsetDirection = positionOffset;
-    } else if(dy > 0) {
+    } else if (dy > 0) {
       // Linha vai para baixo - curva para baixo (offset positivo)
       offsetDirection = baseOffset;
     } else {
       // Linha vai para cima - curva para cima (offset negativo)
       offsetDirection = -baseOffset;
     }
-    
+
     // Adiciona offset de posição para separar linhas próximas
     const adjustedOffset = offsetDirection + (positionOffset * 0.2);
-    
+
     // Control points baseados no código fornecido (35% e 70% da distância horizontal)
     const cx1 = x1 + dx * 0.35;
     const cy1 = y1 + adjustedOffset;              // primeiro ponto de controle
-    
+
     const cx2 = x1 + dx * 0.70;
     const cy2 = y2 + adjustedOffset * 0.25;        // segundo ponto de controle (volta suavemente)
-    
+
     // Usa curva bezier cúbica
     const d = `M ${x1} ${y1} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${x2} ${y2}`;
     path.setAttribute('d', d);
@@ -1377,79 +1377,79 @@ function renderTree(tree, decimals){
     path.setAttribute('fill', 'none');
     return path;
   }
-  
+
   // Agrupa links por nó de origem para calcular offsets relativos
   const linksByFrom = new Map();
   links.forEach(link => {
-    if(!linksByFrom.has(link.from)) {
+    if (!linksByFrom.has(link.from)) {
       linksByFrom.set(link.from, []);
     }
     linksByFrom.get(link.from).push(link);
   });
-  
+
   // Desenha conexões primeiro (para ficarem atrás dos nós)
   links.forEach(link => {
     const fromNode = nodes.find(n => n.id === link.from);
     const toNode = nodes.find(n => n.id === link.to);
-    if(!fromNode || !toNode) return;
-    
+    if (!fromNode || !toNode) return;
+
     // Determina cor e largura baseado no tipo de conexão
     let color = '#555';
     let width = 2.5; // Aumentado de 2 para 2.5
-    
-    if(toNode.type === 'solution') {
+
+    if (toNode.type === 'solution') {
       // Linha para solução usa cor da solução com transparência
       const coord = parseCoord(toNode.coordStr);
-      if(coord && coord.pri === 'I') {
+      if (coord && coord.pri === 'I') {
         color = '#ff444466'; // Vermelho com transparência
-      } else if(coord && (coord.pri === 'II' || coord.pri === 'III')) {
+      } else if (coord && (coord.pri === 'II' || coord.pri === 'III')) {
         color = '#4299e166'; // Azul com transparência
       }
       width = 1.5; // Aumentado de 1 para 1.5
-    } else if(toNode.type === 'secondary') {
+    } else if (toNode.type === 'secondary') {
       color = '#444';
       width = 2; // Aumentado de 1.5 para 2
     }
-    
+
     // Calcula offset de posição baseado nos links do mesmo nó de origem
     const sameFromLinks = linksByFrom.get(link.from) || [];
     const sortedSameFrom = sameFromLinks
       .map(l => ({ link: l, toNode: nodes.find(n => n.id === l.to) }))
       .filter(l => l.toNode)
       .sort((a, b) => a.toNode.y - b.toNode.y);
-    
+
     const linkIndex = sortedSameFrom.findIndex(l => l.link === link);
     const totalLinks = sortedSameFrom.length;
-    
+
     // Offset baseado na posição relativa (0 para o meio, negativo para cima, positivo para baixo)
-    const positionOffset = totalLinks > 1 
-      ? (linkIndex - (totalLinks - 1) / 2) * 15 
+    const positionOffset = totalLinks > 1
+      ? (linkIndex - (totalLinks - 1) / 2) * 15
       : 0;
-    
+
     const path = drawCurve(fromNode.x, fromNode.y, toNode.x, toNode.y, color, width, positionOffset);
     svg.appendChild(path);
   });
-  
+
   // Função para determinar cor do círculo baseado no tipo e coordenada (baseada no código React)
   function getCircleColor(node) {
-    if(node.type === 'root') {
+    if (node.type === 'root') {
       return '#888'; // Cinza para root
     }
-    if(node.type === 'branch' || node.type === 'secondary') {
+    if (node.type === 'branch' || node.type === 'secondary') {
       return '#666'; // Cinza mais escuro para branches
     }
-    if(node.type === 'solution' && node.coordStr) {
+    if (node.type === 'solution' && node.coordStr) {
       // Determina cor baseado na coordenada (baseado no código React)
       const coord = parseCoord(node.coordStr);
-      if(coord && coord.pri === 'I') {
+      if (coord && coord.pri === 'I') {
         return '#ff4444'; // Vermelho para Soluções prontas
-      } else if(coord && coord.pri === 'III' && coord.sec === 1 && coord.ter === 'b') {
+      } else if (coord && coord.pri === 'III' && coord.sec === 1 && coord.ter === 'b') {
         return '#ff8c00'; // Laranja para PLIM 2.0 DMZ na SEG (III.1.b)
-      } else if(coord && coord.pri === 'III' && coord.sec === 2) {
+      } else if (coord && coord.pri === 'III' && coord.sec === 2) {
         // Para III.2, verifica qual solução
-        if(coord.ter === 'a' || coord.ter === 'b') {
+        if (coord.ter === 'a' || coord.ter === 'b') {
           return '#ff8c00'; // Laranja
-        } else if(coord.ter === 'c') {
+        } else if (coord.ter === 'c') {
           return '#4299e1'; // Azul
         }
       }
@@ -1458,7 +1458,7 @@ function renderTree(tree, decimals){
     }
     return '#666'; // Fallback
   }
-  
+
   // Desenha nós (baseado no código React)
   nodes.forEach(node => {
     const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
@@ -1468,33 +1468,33 @@ function renderTree(tree, decimals){
     circle.setAttribute('r', radius);
     const fillColor = getCircleColor(node);
     circle.setAttribute('fill', fillColor);
-    
+
     // Borda baseada no tipo (baseado no código React)
-    if(node.type === 'solution') {
+    if (node.type === 'solution') {
       circle.setAttribute('stroke', fillColor);
       circle.setAttribute('stroke-width', '1.5');
     } else {
       circle.setAttribute('stroke', '#444');
       circle.setAttribute('stroke-width', '1');
     }
-    
-    if(node.type === 'solution'){
+
+    if (node.type === 'solution') {
       circle.style.cursor = 'pointer';
     }
     svg.appendChild(circle);
-    
+
     // Texto do nó - posicionado à direita (baseado no código React)
     const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
     text.setAttribute('x', node.x + 15); // Offset à direita
     text.setAttribute('y', node.y + 4); // Alinhado verticalmente
     text.setAttribute('text-anchor', 'start');
-    
+
     // Cores e fontes - texto claro para todos (como na imagem)
-    if(node.type === 'root') {
+    if (node.type === 'root') {
       text.setAttribute('fill', '#fff');
       text.setAttribute('font-size', '14');
       text.setAttribute('font-weight', 'bold');
-    } else if(node.type === 'solution') {
+    } else if (node.type === 'solution') {
       text.setAttribute('fill', '#cfcfcf');
       text.setAttribute('font-size', '12');
       text.setAttribute('font-weight', 'normal');
@@ -1503,18 +1503,18 @@ function renderTree(tree, decimals){
       text.setAttribute('font-size', '12');
       text.setAttribute('font-weight', 'normal');
     }
-    
+
     // Define o texto do label
     text.textContent = node.label;
-    
-    if(node.type === 'solution'){
+
+    if (node.type === 'solution') {
       text.style.cursor = 'pointer';
       text.style.textDecoration = 'underline';
     }
     svg.appendChild(text);
-    
+
     // Adiciona clique para soluções
-    if(node.type === 'solution' && node.solution){
+    if (node.type === 'solution' && node.solution) {
       circle.addEventListener('click', (e) => {
         e.preventDefault();
         showSolutionModal(node.shortLabel, node.coordStr);
@@ -1525,8 +1525,8 @@ function renderTree(tree, decimals){
       });
     }
   });
-  
-  
+
+
   // Ajusta viewBox para incluir todos os nós com padding adequado
   const allX = nodes.map(n => n.x);
   const allY = nodes.map(n => n.y);
@@ -1539,26 +1539,26 @@ function renderTree(tree, decimals){
 }
 
 // -------- toggle helpers --------
-function show(el){ el.style.display='block'; }
-function hide(el){ el.style.display='none'; }
-function toggle(el){ el.style.display = (el.style.display==='none' || !el.style.display) ? 'block' : 'none'; }
+function show(el) { el.style.display = 'block'; }
+function hide(el) { el.style.display = 'none'; }
+function toggle(el) { el.style.display = (el.style.display === 'none' || !el.style.display) ? 'block' : 'none'; }
 
 // -------- Bootstrap --------
 (async () => {
-    const entrada = await initEntrada({ imgSrc: IMG_SRC, vertexToChannel: ['B','R','G'] });
-    const CSVS = await loadCSVs();
-    await loadSolutionDescriptions();
-    setupSolutionLinks();
+  const entrada = await initEntrada({ imgSrc: IMG_SRC, vertexToChannel: ['B', 'R', 'G'] });
+  const CSVS = await loadCSVs();
+  await loadSolutionDescriptions();
+  setupSolutionLinks();
 
-    // Configura fechamento do modal
-    const modal = document.getElementById('solutionModal');
-    const closeBtn = document.getElementById('closeModal');
-  if(closeBtn && modal){
-      closeBtn.addEventListener('click', () => modal.close());
-    }
-  if(modal){
+  // Configura fechamento do modal
+  const modal = document.getElementById('solutionModal');
+  const closeBtn = document.getElementById('closeModal');
+  if (closeBtn && modal) {
+    closeBtn.addEventListener('click', () => modal.close());
+  }
+  if (modal) {
     modal.addEventListener('click', (e) => {
-      if(e.target === modal) modal.close();
+      if (e.target === modal) modal.close();
     });
   }
 
@@ -1568,17 +1568,17 @@ function toggle(el){ el.style.display = (el.style.display==='none' || !el.style.
   const rankingSection = document.getElementById('rankingSection');
   const treeSection = document.getElementById('treeSection');
 
-  entrada.onConfirm(({r,g,b})=>{
-    try{
+  entrada.onConfirm(({ r, g, b }) => {
+    try {
       // ranking - retorna {items, decimals}
-      const rankingResult = computeRanking(CSVS.z, {r,g,b});
+      const rankingResult = computeRanking(CSVS.z, { r, g, b });
       const rows = rankingResult.items;
       const numDecimals = rankingResult.decimals;
-      rows.sort((a,b)=> b.Zranking - a.Zranking);
+      rows.sort((a, b) => b.Zranking - a.Zranking);
 
       // enriquece com nomes/coords
       const items = enrichWithNames(rows, CSVS.n);
-      
+
       // Aplica clustering aos itens
       const clusteredItems = smartCluster(items);
 
@@ -1586,26 +1586,26 @@ function toggle(el){ el.style.display = (el.style.display==='none' || !el.style.
       renderPodiumClusters(clusteredItems, numDecimals);
 
       // Ranking completo (mantém oculto até clicar)
-      renderTable(clusteredItems, numDecimals, {r,g,b});
+      renderTable(clusteredItems, numDecimals, { r, g, b });
 
       // Salva dados para geração de relatório
       currentRankingData = {
         items: clusteredItems,
         decimals: numDecimals
       };
-      currentPriorities = {r, g, b};
+      currentPriorities = { r, g, b };
 
       // Árvore (mantém oculta até clicar)
       const tree = buildTree(items);
       renderTree(tree, numDecimals);
 
       // listeners (uma vez só)
-      if(!btnRanking.dataset.bound){
-        btnRanking.addEventListener('click', ()=> toggle(rankingSection));
+      if (!btnRanking.dataset.bound) {
+        btnRanking.addEventListener('click', () => toggle(rankingSection));
         btnRanking.dataset.bound = '1';
       }
-      if(!btnTree.dataset.bound){
-        btnTree.addEventListener('click', ()=> toggle(treeSection));
+      if (!btnTree.dataset.bound) {
+        btnTree.addEventListener('click', () => toggle(treeSection));
         btnTree.dataset.bound = '1';
       }
 
@@ -1614,29 +1614,29 @@ function toggle(el){ el.style.display = (el.style.display==='none' || !el.style.
       const reportConfirmDlg = document.getElementById('reportConfirmDlg');
       const reportConfirmOk = document.getElementById('reportConfirmOk');
       const reportConfirmCancel = document.getElementById('reportConfirmCancel');
-      
-      if(btnGenerateReport && !btnGenerateReport.dataset.bound){
+
+      if (btnGenerateReport && !btnGenerateReport.dataset.bound) {
         btnGenerateReport.addEventListener('click', () => {
-          if(!currentRankingData || !currentPriorities){
+          if (!currentRankingData || !currentPriorities) {
             alert('Por favor, confirme as prioridades primeiro para gerar o relatório.');
             return;
           }
-          if(reportConfirmDlg){
+          if (reportConfirmDlg) {
             // Salva posição de scroll atual
             const scrollY = window.scrollY || window.pageYOffset;
-            
+
             // Previne scroll do body quando modal está aberto
             document.body.style.position = 'fixed';
             document.body.style.top = `-${scrollY}px`;
             document.body.style.width = '100%';
             document.body.style.overflow = 'hidden';
-            
-          reportConfirmDlg.showModal();
-            
+
+            reportConfirmDlg.showModal();
+
             // Força centralização após abrir o modal (para garantir em todos os navegadores)
             setTimeout(() => {
               const dialog = reportConfirmDlg;
-              if(dialog && dialog.open){
+              if (dialog && dialog.open) {
                 // Garante posicionamento fixo baseado na viewport
                 dialog.style.margin = 'auto';
                 dialog.style.position = 'fixed';
@@ -1645,12 +1645,12 @@ function toggle(el){ el.style.display = (el.style.display==='none' || !el.style.
                 dialog.style.right = '0';
                 dialog.style.bottom = '0';
                 dialog.style.inset = '0';
-                if(window.innerWidth <= 768){
+                if (window.innerWidth <= 768) {
                   dialog.style.maxHeight = '85vh';
                 }
               }
             }, 10);
-            
+
             // Função para restaurar scroll
             const restoreScroll = () => {
               const savedScrollY = document.body.style.top;
@@ -1658,23 +1658,23 @@ function toggle(el){ el.style.display = (el.style.display==='none' || !el.style.
               document.body.style.top = '';
               document.body.style.width = '';
               document.body.style.overflow = '';
-              if(savedScrollY){
+              if (savedScrollY) {
                 window.scrollTo(0, parseInt(savedScrollY.replace('-', '').replace('px', '')) || scrollY);
               } else {
                 window.scrollTo(0, scrollY);
               }
             };
-            
+
             // Adiciona listeners para restaurar scroll ao fechar
             reportConfirmDlg.addEventListener('close', restoreScroll, { once: true });
           }
         });
-        
-        if(reportConfirmCancel){
+
+        if (reportConfirmCancel) {
           reportConfirmCancel.addEventListener('click', () => {
             // Restaura scroll antes de fechar
             const savedScrollY = document.body.style.top;
-            if(savedScrollY){
+            if (savedScrollY) {
               document.body.style.position = '';
               document.body.style.top = '';
               document.body.style.width = '';
@@ -1685,12 +1685,12 @@ function toggle(el){ el.style.display = (el.style.display==='none' || !el.style.
             reportConfirmDlg.close();
           });
         }
-        
-        if(reportConfirmOk){
+
+        if (reportConfirmOk) {
           reportConfirmOk.addEventListener('click', async () => {
             // Restaura scroll antes de fechar
             const savedScrollY = document.body.style.top;
-            if(savedScrollY){
+            if (savedScrollY) {
               document.body.style.position = '';
               document.body.style.top = '';
               document.body.style.width = '';
@@ -1702,12 +1702,12 @@ function toggle(el){ el.style.display = (el.style.display==='none' || !el.style.
             await generateReport();
           });
         }
-        
+
         btnGenerateReport.dataset.bound = '1';
       }
 
       console.log('(r,g,b) puros ->', r.toFixed(6), g.toFixed(6), b.toFixed(6));
-    }catch(err){
+    } catch (err) {
       console.error(err); alert(err.message || 'Erro ao processar CSV.');
     }
   });
