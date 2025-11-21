@@ -372,6 +372,9 @@ trackPageView('input');
 
 console.log('✅ Tracking initialized. Session ID:', trackingSession.sessionId);
 
+// Export trackingSession to window for access by other modules
+window.trackingSession = trackingSession;
+
 // Export functions to window for debugging (only in dev)
 if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
     window.tracking = {
@@ -382,4 +385,5 @@ if (window.location.hostname === 'localhost' || window.location.hostname === '12
     };
     console.log('💡 Debug: Use window.tracking to access tracking functions');
 }
+
 
