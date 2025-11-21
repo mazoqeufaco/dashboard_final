@@ -395,13 +395,18 @@ def generate_report():
         
         # Get user IP and city from request data (preferred) or session data (fallback)
         location_data = data.get('location', {})
+        print(f"📍 Backend received location data: {location_data}")
+        
         user_ip = location_data.get('ip', 'N/A')
         user_city = location_data.get('city', 'N/A')
         user_region = location_data.get('region', 'N/A')
         user_country = location_data.get('country', 'N/A')
         
+        print(f"📍 Parsed location - IP: {user_ip}, City: {user_city}, Region: {user_region}, Country: {user_country}")
+        
         # Fallback to CSV if not provided in request
         if (user_ip == 'N/A' or user_city == 'N/A') and session_id and SESSIONS_CSV.exists():
+            print(f"⚠️ Location data incomplete, trying CSV fallback for session: {session_id}")
             try:
                 with open(SESSIONS_CSV, 'r', encoding='utf-8') as f:
                     reader = csv.DictReader(f)
@@ -411,8 +416,10 @@ def generate_report():
                             if user_city == 'N/A': user_city = row.get('city', 'N/A')
                             if user_region == 'N/A': user_region = row.get('region', 'N/A')
                             if user_country == 'N/A': user_country = row.get('country', 'N/A')
+                            print(f"📍 CSV fallback - IP: {user_ip}, City: {user_city}, Region: {user_region}, Country: {user_country}")
                             break
-            except Exception:
+            except Exception as e:
+                print(f"❌ CSV fallback error: {e}")
                 pass # Ignore CSV errors
                 
         # Format location string for PDF - IP, City, State
@@ -427,6 +434,7 @@ def generate_report():
             location_parts.append(user_country)
         
         location_str = ", ".join(location_parts) if location_parts else "Localização não identificada"
+        print(f"📍 Final location string for PDF: {location_str}")
 
         
         # Generate hash - usa rankingTable para consistência
