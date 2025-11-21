@@ -387,9 +387,9 @@ export async function initEntrada(opts = {}) {
     finalW = finalH / equilateralRatio;
   }
 
-  // Aplica uma margem de segurança (75% do tamanho disponível para dar espaço aos labels)
-  finalW *= 0.75;
-  finalH *= 0.75;
+  // Aplica uma margem de segurança (82% do tamanho disponível para dar espaço aos labels)
+  finalW *= 0.82;
+  finalH *= 0.82;
 
   const w = Math.round(finalW);
   const h = Math.round(finalH);
