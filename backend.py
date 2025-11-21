@@ -106,11 +106,15 @@ def get_location():
         
         # If localhost, try to get public IP from API (without specifying IP)
         if client_ip in ['127.0.0.1', '::1', 'localhost']:
+            print(f"🔍 Detected localhost IP: {client_ip}")
             # For localhost, query API without IP to get server's public IP and location
             try:
+                print("📡 Attempting to fetch public IP from ipapi.co...")
                 response = requests.get('https://ipapi.co/json/', timeout=5)
+                print(f"📡 Response status: {response.status_code}")
                 if response.status_code == 200:
                     data = response.json()
+                    print(f"📡 Response data: {data}")
                     if 'error' not in data and data.get('ip'):
                         return jsonify({
                             'ip': data.get('ip', ''),
@@ -123,17 +127,19 @@ def get_location():
                             'timezone': data.get('timezone', '')
                         }), 200
             except Exception as e:
-                print(f"Erro ao buscar localização pública via API: {e}")
-            # Fallback: return localhost IP
+                print(f"❌ Erro ao buscar localização pública via API: {e}")
+            
+            # Fallback for development: return mock data
+            print("⚠️ Using mock location data for localhost")
             return jsonify({
                 'ip': '127.0.0.1',
-                'city': '',
-                'region': '',
-                'country': '',
-                'country_code': '',
-                'latitude': '',
-                'longitude': '',
-                'timezone': ''
+                'city': 'São Paulo',
+                'region': 'SP',
+                'country': 'Brazil',
+                'country_code': 'BR',
+                'latitude': '-23.5505',
+                'longitude': '-46.6333',
+                'timezone': 'America/Sao_Paulo'
             }), 200
         
         # If we have a real IP, query API with that IP
