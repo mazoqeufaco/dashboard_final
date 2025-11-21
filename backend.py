@@ -849,6 +849,54 @@ Este email contém o relatório PDF em anexo.
         traceback.print_exc()
         raise
 
+@app.route('/api/test-email', methods=['GET'])
+def test_email_endpoint():
+    """Test email configuration"""
+    try:
+        smtp_server = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
+        smtp_port = int(os.getenv('SMTP_PORT', '587'))
+        email_from = os.getenv('EMAIL_FROM', 'noetikaai@gmail.com')
+        email_password = os.getenv('EMAIL_PASSWORD', '')
+        
+        if not email_password:
+            return jsonify({
+                'status': 'error',
+                'message': 'EMAIL_PASSWORD not configured in environment variables'
+            }), 500
+            
+        # Create simple message
+        msg = MIMEMultipart()
+        msg['From'] = email_from
+        msg['To'] = email_from
+        msg['Subject'] = "Teste de Configuração de Email - Tribússola"
+        msg.attach(MIMEText("Se você recebeu este email, a configuração SMTP está correta.", 'plain'))
+        
+        # Try to connect and send
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()
+        server.login(email_from, email_password)
+        server.sendmail(email_from, [email_from], msg.as_string())
+        server.quit()
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'Email de teste enviado com sucesso para {email_from}',
+            'config': {
+                'server': smtp_server,
+                'port': smtp_port,
+                'user': email_from,
+                'password_configured': 'Yes'
+            }
+        }), 200
+        
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'status': 'error',
+            'message': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
+
 if __name__ == '__main__':
     import sys
     

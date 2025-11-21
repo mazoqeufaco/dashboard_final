@@ -372,45 +372,38 @@ export async function initEntrada(opts = {}) {
   const maxW = canvas.width - (padSides * 2);
   const maxH = canvas.height - padTop - padBottom;
 
-  // Calcula escala mantendo proporção da imagem
-  const imgAspect = img.width / img.height;
-  const canvasAspect = maxW / maxH;
+  // Força proporção de triângulo equilátero (altura = lado * sqrt(3) / 2)
+  const equilateralRatio = Math.sqrt(3) / 2; // ~0.866
 
-  let scale;
-  if (imgAspect > canvasAspect) {
-    // Imagem é mais larga - limita pela largura
-    scale = (maxW / img.width) * 0.85; // 85% da largura disponível
+  let finalW, finalH;
+  // Verifica se o limitante é a largura ou a altura
+  if (maxH / maxW > equilateralRatio) {
+    // Canvas é mais alto que o necessário, limita pela largura
+    finalW = maxW;
+    finalH = finalW * equilateralRatio;
   } else {
-    // Imagem é mais alta - limita pela altura
-    scale = (maxH / img.height) * 0.85; // 85% da altura disponível
+    // Canvas é mais largo que o necessário, limita pela altura
+    finalH = maxH;
+    finalW = finalH / equilateralRatio;
   }
 
-  const w = Math.round(img.width * scale);
-  const h = Math.round(img.height * scale);
+  // Aplica uma margem de segurança (90% do tamanho disponível)
+  finalW *= 0.9;
+  finalH *= 0.9;
+
+  const w = Math.round(finalW);
+  const h = Math.round(finalH);
   const x = Math.floor((canvas.width - w) / 2);
   const y = padTop + Math.floor((canvas.height - padTop - padBottom - h) / 2);
 
-  // Tenta detectar vértices, com fallback seguro
-  let v;
-  try {
-    v = detectVerticesByAlpha(img, w, h);
-    // Valida os vértices retornados
-    if (!v || !v.top || !v.left || !v.right ||
-      isNaN(v.top.x) || isNaN(v.top.y) ||
-      isNaN(v.left.x) || isNaN(v.left.y) ||
-      isNaN(v.right.x) || isNaN(v.right.y)) {
-      throw new Error('Vértices inválidos retornados');
-    }
-  } catch (err) {
-    console.warn('Erro ao detectar vértices, usando fallback geométrico:', err.message || err);
-    // Fallback geométrico seguro
-    v = {
-      top: { x: Math.floor(w / 2), y: 0 },
-      left: { x: 0, y: h - 1 },
-      right: { x: w - 1, y: h - 1 }
-    };
-  }
+  // Define vértices para um triângulo equilátero perfeito
+  const v = {
+    top: { x: w / 2, y: 0 },
+    left: { x: 0, y: h },
+    right: { x: w, y: h }
+  };
 
+  console.log('Vértices calculados (Equilátero):', v);
   // Variáveis que serão atualizadas no resize
   let rect = { x, y, w, h };
   let Vtop = { x: x + v.top.x, y: y + v.top.y };

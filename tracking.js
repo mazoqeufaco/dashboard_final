@@ -20,37 +20,10 @@ function generateSessionId() {
     return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 }
 
-// Get user's IP and location (via backend to avoid CORS issues)
+// Get user's IP and location
 async function getUserLocation() {
     try {
-        // First try to get location via backend (avoids CORS)
-        const response = await fetch('/api/get-location');
-        if (response.ok) {
-            const data = await response.json();
-            if (data.ip) {
-                trackingSession.ip = data.ip;
-                trackingSession.location = {
-                    city: data.city || '',
-                    region: data.region || '',
-                    country: data.country || '',
-                    country_code: data.country_code || '',
-                    latitude: data.latitude || '',
-                    longitude: data.longitude || '',
-                    timezone: data.timezone || ''
-                };
-                
-                console.log('✅ User location tracked via backend:', trackingSession.location);
-                
-                // Update session on server with location data
-                await updateSessionWithLocation();
-                
-                // Save to localStorage
-                saveTrackingData();
-                return;
-            }
-        }
-        
-        // Fallback: try direct API (may fail due to CORS, but worth trying)
+        // 1. Try direct API first (most accurate for client IP)
         try {
             const directResponse = await fetch('https://ipapi.co/json/');
             if (directResponse.ok) {
@@ -66,7 +39,7 @@ async function getUserLocation() {
                         longitude: data.longitude || '',
                         timezone: data.timezone || ''
                     };
-                    
+
                     console.log('✅ User location tracked via direct API:', trackingSession.location);
                     await updateSessionWithLocation();
                     saveTrackingData();
@@ -74,13 +47,40 @@ async function getUserLocation() {
                 }
             }
         } catch (directError) {
-            console.warn('⚠️ Direct API failed (expected due to CORS):', directError.message);
+            console.warn('⚠️ Direct API failed, trying backend:', directError.message);
         }
-        
+
+        // 2. Fallback: try backend (avoids CORS if direct fails)
+        const response = await fetch('/api/get-location');
+        if (response.ok) {
+            const data = await response.json();
+            if (data.ip) {
+                trackingSession.ip = data.ip;
+                trackingSession.location = {
+                    city: data.city || '',
+                    region: data.region || '',
+                    country: data.country || '',
+                    country_code: data.country_code || '',
+                    latitude: data.latitude || '',
+                    longitude: data.longitude || '',
+                    timezone: data.timezone || ''
+                };
+
+                console.log('✅ User location tracked via backend:', trackingSession.location);
+
+                // Update session on server with location data
+                await updateSessionWithLocation();
+
+                // Save to localStorage
+                saveTrackingData();
+                return;
+            }
+        }
+
         // If all fails, at least try to get IP
         console.warn('⚠️ Could not get full location data');
         trackingSession.location = { error: 'Location not available' };
-        
+
     } catch (error) {
         console.error('❌ Failed to get user location:', error);
         trackingSession.location = { error: 'Location not available' };
@@ -100,17 +100,17 @@ function trackEvent(eventType, eventData = {}) {
         data: eventData,
         page: getCurrentPage()
     };
-    
+
     trackingSession.events.push(event);
-    
+
     // Log to console for debugging (only in dev)
     if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
         console.log('📊 Event tracked:', event);
     }
-    
+
     // Save to localStorage
     saveTrackingData();
-    
+
     // Send to server (if available)
     sendToServer(event);
 }
@@ -120,7 +120,7 @@ function getCurrentPage() {
     const rankingSection = document.getElementById('rankingSection');
     const treeSection = document.getElementById('treeSection');
     const podium = document.querySelector('.podium');
-    
+
     if (treeSection && treeSection.style.display !== 'none') {
         return 'tree';
     }
@@ -168,12 +168,12 @@ async function sendToServer(event) {
         const response = await fetch('/api/track', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                session: trackingSession, 
-                event: event 
+            body: JSON.stringify({
+                session: trackingSession,
+                event: event
             })
         });
-        
+
         if (!response.ok) {
             console.error('Server response not OK:', response.status);
         }
@@ -191,9 +191,9 @@ async function updateSessionWithLocation() {
             await fetch('/api/track', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    session: trackingSession, 
-                    event: { 
+                body: JSON.stringify({
+                    session: trackingSession,
+                    event: {
                         type: 'location_updated',
                         timestamp: new Date().toISOString(),
                         page: getCurrentPage(),
@@ -216,8 +216,8 @@ function updateTimeSpent() {
     const timeOnPage = (currentTime - pageStartTime) / 1000; // seconds
     totalTimeSpent += timeOnPage;
     pageStartTime = currentTime;
-    
-    trackEvent('time_update', { 
+
+    trackEvent('time_update', {
         timeOnPage: Math.round(timeOnPage),
         totalTime: Math.round(totalTimeSpent)
     });
@@ -229,15 +229,15 @@ setInterval(updateTimeSpent, 30000);
 // Track when user leaves page
 window.addEventListener('beforeunload', () => {
     updateTimeSpent();
-    trackEvent('session_end', { 
+    trackEvent('session_end', {
         totalDuration: Math.round(totalTimeSpent),
         totalEvents: trackingSession.events.length
     });
-    
+
     // Try to send final data synchronously
     try {
-        navigator.sendBeacon('/api/track', JSON.stringify({ 
-            session: trackingSession, 
+        navigator.sendBeacon('/api/track', JSON.stringify({
+            session: trackingSession,
             event: { type: 'session_end', timestamp: new Date().toISOString() }
         }));
     } catch (e) {
@@ -261,10 +261,10 @@ let maxScrollDepth = 0;
 
 window.addEventListener('scroll', () => {
     const scrollPercentage = (window.scrollY / (document.documentElement.scrollHeight - window.innerHeight)) * 100;
-    
+
     if (scrollPercentage > maxScrollDepth) {
         maxScrollDepth = Math.round(scrollPercentage);
-        
+
         // Track milestones: 25%, 50%, 75%, 100%
         if ([25, 50, 75, 100].includes(maxScrollDepth)) {
             trackEvent('scroll_depth', { depth: maxScrollDepth });
@@ -276,7 +276,7 @@ window.addEventListener('scroll', () => {
 document.addEventListener('click', (e) => {
     const target = e.target;
     const tagName = target.tagName.toLowerCase();
-    
+
     // Track button clicks
     if (tagName === 'button' || target.classList.contains('btn')) {
         const buttonId = target.id || 'no-id';
@@ -287,14 +287,14 @@ document.addEventListener('click', (e) => {
             classes: target.className
         });
     }
-    
+
     // Track triangle clicks
     if (target.id === 'tri' || target.closest('#tri')) {
         trackEvent('triangle_interaction', {
             element: 'canvas'
         });
     }
-    
+
     // Track input changes (when clicking on number inputs)
     if (tagName === 'input' && target.type === 'number') {
         trackEvent('input_focus', {
@@ -328,11 +328,11 @@ function exportTrackingDataCSV() {
         event.page,
         JSON.stringify(event.data)
     ]);
-    
+
     const csv = [headers, ...rows]
         .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
         .join('\n');
-    
+
     return csv;
 }
 
