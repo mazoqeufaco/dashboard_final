@@ -1079,6 +1079,17 @@ async function generateReport() {
       ? trackingSession.sessionId
       : (window.trackingSession?.sessionId || '');
 
+    // Prepare location data
+    const locationData = {
+      city: (typeof window.trackingSession !== 'undefined' && window.trackingSession?.location?.city) || '',
+      region: (typeof window.trackingSession !== 'undefined' && window.trackingSession?.location?.region) || '',
+      country: (typeof window.trackingSession !== 'undefined' && window.trackingSession?.location?.country) || '',
+      ip: (typeof window.trackingSession !== 'undefined' && window.trackingSession?.ip) || ''
+    };
+
+    console.log('📍 Sending location data to backend:', locationData);
+    console.log('📍 Full trackingSession:', window.trackingSession);
+
     const response = await fetch('/api/generate-report', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1092,12 +1103,7 @@ async function generateReport() {
         },
         graphImage,
         sessionId,
-        location: {
-          city: (typeof window.trackingSession !== 'undefined' && window.trackingSession?.location?.city) || '',
-          region: (typeof window.trackingSession !== 'undefined' && window.trackingSession?.location?.region) || '',
-          country: (typeof window.trackingSession !== 'undefined' && window.trackingSession?.location?.country) || '',
-          ip: (typeof window.trackingSession !== 'undefined' && window.trackingSession?.ip) || ''
-        }
+        location: locationData
       })
     });
 

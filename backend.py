@@ -415,12 +415,19 @@ def generate_report():
             except Exception:
                 pass # Ignore CSV errors
                 
-        # Format location string for PDF
-        location_str = f"{user_city}, {user_region}"
-        if user_country != 'N/A':
-            location_str += f", {user_country}"
-        if location_str == "N/A, N/A":
-            location_str = "Localização não identificada"
+        # Format location string for PDF - IP, City, State
+        location_parts = []
+        if user_ip and user_ip != 'N/A':
+            location_parts.append(f"IP: {user_ip}")
+        if user_city and user_city != 'N/A':
+            location_parts.append(user_city)
+        if user_region and user_region != 'N/A':
+            location_parts.append(user_region)
+        if user_country and user_country != 'N/A':
+            location_parts.append(user_country)
+        
+        location_str = ", ".join(location_parts) if location_parts else "Localização não identificada"
+
         
         # Generate hash - usa rankingTable para consistência
         hash_data = f"{session_id}{now.isoformat()}{json.dumps(ranking, sort_keys=True)}"
