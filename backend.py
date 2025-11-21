@@ -387,18 +387,34 @@ def generate_report():
         date_str = now.strftime('%d/%m/%Y')
         time_str = now.strftime('%H:%M:%S')
         
-        # Get user IP and city from session data
-        user_ip = 'N/A'
-        user_city = 'N/A'
+        # Get user IP and city from request data (preferred) or session data (fallback)
+        location_data = data.get('location', {})
+        user_ip = location_data.get('ip', 'N/A')
+        user_city = location_data.get('city', 'N/A')
+        user_region = location_data.get('region', 'N/A')
+        user_country = location_data.get('country', 'N/A')
         
-        if session_id and SESSIONS_CSV.exists():
-            with open(SESSIONS_CSV, 'r', encoding='utf-8') as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    if row['session_id'] == session_id:
-                        user_ip = row.get('ip', 'N/A')
-                        user_city = row.get('city', 'N/A')
-                        break
+        # Fallback to CSV if not provided in request
+        if (user_ip == 'N/A' or user_city == 'N/A') and session_id and SESSIONS_CSV.exists():
+            try:
+                with open(SESSIONS_CSV, 'r', encoding='utf-8') as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        if row['session_id'] == session_id:
+                            if user_ip == 'N/A': user_ip = row.get('ip', 'N/A')
+                            if user_city == 'N/A': user_city = row.get('city', 'N/A')
+                            if user_region == 'N/A': user_region = row.get('region', 'N/A')
+                            if user_country == 'N/A': user_country = row.get('country', 'N/A')
+                            break
+            except Exception:
+                pass # Ignore CSV errors
+                
+        # Format location string for PDF
+        location_str = f"{user_city}, {user_region}"
+        if user_country != 'N/A':
+            location_str += f", {user_country}"
+        if location_str == "N/A, N/A":
+            location_str = "Localização não identificada"
         
         # Generate hash - usa rankingTable para consistência
         hash_data = f"{session_id}{now.isoformat()}{json.dumps(ranking, sort_keys=True)}"
@@ -439,12 +455,7 @@ def generate_report():
         # Hash
         elements.append(Paragraph(f"<b>Hash:</b> {report_hash}", styles['Normal']))
         elements.append(Spacer(1, 6))
-        
-        # IP and City
-        elements.append(Paragraph(
-            f"Requisitado a partir de: {user_ip}, {user_city}",
-            styles['Normal']
-        ))
+        elements.append(Paragraph(f"<b>Requisitado a partir de:</b> {location_str}", styles['Normal']))
         elements.append(Spacer(1, 20))
         
         # Subtitle with priorities - converte r, g, b para percentuais

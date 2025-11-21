@@ -1091,7 +1091,13 @@ async function generateReport() {
           b: parseFloat(bPct)
         },
         graphImage,
-        sessionId
+        sessionId,
+        location: {
+          city: trackingSession?.location?.city || '',
+          region: trackingSession?.location?.region || '',
+          country: trackingSession?.location?.country || '',
+          ip: trackingSession?.ip || ''
+        }
       })
     });
 
