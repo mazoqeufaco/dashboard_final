@@ -22,59 +22,74 @@ function generateSessionId() {
 
 // Get user's IP and location
 async function getUserLocation() {
+    // Helper for timeout
+    const fetchWithTimeout = (url, timeout = 2000) => {
+        return Promise.race([
+            fetch(url),
+            new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Timeout')), timeout)
+            )
+        ]);
+    };
+
     try {
-        // 1. Try direct API first (ipapi.co)
+        // Try both APIs in parallel with short timeout (2s)
+        // We want the first one that succeeds
         try {
-            const directResponse = await fetch('https://ipapi.co/json/');
-            if (directResponse.ok) {
-                const data = await directResponse.json();
-                if (data.ip && !data.error) {
-                    trackingSession.ip = data.ip;
-                    trackingSession.location = {
-                        city: data.city || '',
-                        region: data.region || '',
-                        country: data.country_name || '',
-                        country_code: data.country_code || '',
-                        latitude: data.latitude || '',
-                        longitude: data.longitude || '',
-                        timezone: data.timezone || ''
-                    };
+            const result = await Promise.any([
+                // 1. ipapi.co
+                fetchWithTimeout('https://ipapi.co/json/')
+                    .then(async res => {
+                        if (!res.ok) throw new Error('Status ' + res.status);
+                        const data = await res.json();
+                        if (data.error || !data.ip) throw new Error('Invalid data');
+                        return {
+                            source: 'ipapi.co',
+                            ip: data.ip,
+                            location: {
+                                city: data.city || '',
+                                region: data.region || '',
+                                country: data.country_name || '',
+                                country_code: data.country_code || '',
+                                latitude: data.latitude || '',
+                                longitude: data.longitude || '',
+                                timezone: data.timezone || ''
+                            }
+                        };
+                    }),
 
-                    console.log('✅ User location tracked via ipapi.co:', trackingSession.location);
-                    await updateSessionWithLocation();
-                    saveTrackingData();
-                    return;
-                }
-            }
-        } catch (directError) {
-            console.warn('⚠️ ipapi.co failed, trying fallback:', directError.message);
-        }
+                // 2. ipwho.is
+                fetchWithTimeout('https://ipwho.is/')
+                    .then(async res => {
+                        if (!res.ok) throw new Error('Status ' + res.status);
+                        const data = await res.json();
+                        if (!data.success) throw new Error('Success false');
+                        return {
+                            source: 'ipwho.is',
+                            ip: data.ip,
+                            location: {
+                                city: data.city || '',
+                                region: data.region || '',
+                                country: data.country || '',
+                                country_code: data.country_code || '',
+                                latitude: data.latitude || '',
+                                longitude: data.longitude || '',
+                                timezone: data.timezone?.id || ''
+                            }
+                        };
+                    })
+            ]);
 
-        // 2. Try secondary API (ipwho.is) - Free, no key, supports HTTPS
-        try {
-            const secondaryResponse = await fetch('https://ipwho.is/');
-            if (secondaryResponse.ok) {
-                const data = await secondaryResponse.json();
-                if (data.success) {
-                    trackingSession.ip = data.ip;
-                    trackingSession.location = {
-                        city: data.city || '',
-                        region: data.region || '',
-                        country: data.country || '',
-                        country_code: data.country_code || '',
-                        latitude: data.latitude || '',
-                        longitude: data.longitude || '',
-                        timezone: data.timezone.id || ''
-                    };
+            // If we got here, one of them succeeded
+            trackingSession.ip = result.ip;
+            trackingSession.location = result.location;
+            console.log(`✅ User location tracked via ${result.source}:`, trackingSession.location);
+            await updateSessionWithLocation();
+            saveTrackingData();
+            return;
 
-                    console.log('✅ User location tracked via ipwho.is:', trackingSession.location);
-                    await updateSessionWithLocation();
-                    saveTrackingData();
-                    return;
-                }
-            }
-        } catch (secondaryError) {
-            console.warn('⚠️ ipwho.is failed, trying backend:', secondaryError.message);
+        } catch (parallelError) {
+            console.warn('⚠️ Both external APIs failed or timed out, trying backend fallback...');
         }
 
         // 3. Fallback: try backend (avoids CORS if direct fails)
