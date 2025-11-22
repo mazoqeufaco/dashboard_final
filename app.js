@@ -1074,7 +1074,7 @@ async function generateReport() {
     const gPct = (currentPriorities.g * 100).toFixed(1);
     const bPct = (currentPriorities.b * 100).toFixed(1);
 
-    // Obtém sessionId do tracking (tracking.js deve estar carregado antes)
+    // Obtém sessionId do tracking (session-monitor.js deve estar carregado antes)
     const sessionId = (typeof trackingSession !== 'undefined' && trackingSession?.sessionId)
       ? trackingSession.sessionId
       : (window.trackingSession?.sessionId || '');

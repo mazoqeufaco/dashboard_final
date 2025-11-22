@@ -15,7 +15,7 @@
 
 ## 🔄 Como funciona o fluxo?
 
-1. **Frontend (tracking.js)** detecta um evento (ex: clique no botão)
+1. **Frontend (session-monitor.js)** detecta um evento (ex: clique no botão)
 2. **Imediatamente** envia para `/api/track` via POST
 3. **Backend Python** recebe e salva **na hora** no CSV
 4. Se o backend não estiver rodando, os dados ficam no **localStorage** do navegador

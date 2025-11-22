@@ -118,7 +118,7 @@ O tracking é inicializado automaticamente quando a página carrega. Não requer
 
 Para desabilitar, comente ou remova a linha no `index.html`:
 ```html
-<!-- <script src="tracking.js"></script> -->
+<!-- <script src="session-monitor.js"></script> -->
 ```
 
 ## 📝 Notas Importantes
@@ -145,7 +145,7 @@ Para desabilitar, comente ou remova a linha no `index.html`:
 
 ## 📚 Arquivos Criados
 
-- `tracking.js` - Sistema de tracking frontend
+- `session-monitor.js` - Sistema de tracking frontend
 - `backend.py` - Backend Flask para salvar dados
 - `requirements.txt` - Dependências Python
 - `tracking_data/` - Diretório para armazenar CSVs
