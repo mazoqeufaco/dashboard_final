@@ -23,7 +23,7 @@ function generateSessionId() {
 // Get user's IP and location
 async function getUserLocation() {
     try {
-        // 1. Try direct API first (most accurate for client IP)
+        // 1. Try direct API first (ipapi.co)
         try {
             const directResponse = await fetch('https://ipapi.co/json/');
             if (directResponse.ok) {
@@ -40,17 +40,44 @@ async function getUserLocation() {
                         timezone: data.timezone || ''
                     };
 
-                    console.log('✅ User location tracked via direct API:', trackingSession.location);
+                    console.log('✅ User location tracked via ipapi.co:', trackingSession.location);
                     await updateSessionWithLocation();
                     saveTrackingData();
                     return;
                 }
             }
         } catch (directError) {
-            console.warn('⚠️ Direct API failed, trying backend:', directError.message);
+            console.warn('⚠️ ipapi.co failed, trying fallback:', directError.message);
         }
 
-        // 2. Fallback: try backend (avoids CORS if direct fails)
+        // 2. Try secondary API (ipwho.is) - Free, no key, supports HTTPS
+        try {
+            const secondaryResponse = await fetch('https://ipwho.is/');
+            if (secondaryResponse.ok) {
+                const data = await secondaryResponse.json();
+                if (data.success) {
+                    trackingSession.ip = data.ip;
+                    trackingSession.location = {
+                        city: data.city || '',
+                        region: data.region || '',
+                        country: data.country || '',
+                        country_code: data.country_code || '',
+                        latitude: data.latitude || '',
+                        longitude: data.longitude || '',
+                        timezone: data.timezone.id || ''
+                    };
+
+                    console.log('✅ User location tracked via ipwho.is:', trackingSession.location);
+                    await updateSessionWithLocation();
+                    saveTrackingData();
+                    return;
+                }
+            }
+        } catch (secondaryError) {
+            console.warn('⚠️ ipwho.is failed, trying backend:', secondaryError.message);
+        }
+
+        // 3. Fallback: try backend (avoids CORS if direct fails)
         const response = await fetch('/api/get-location');
         if (response.ok) {
             const data = await response.json();

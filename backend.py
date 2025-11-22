@@ -144,6 +144,7 @@ def get_location():
         
         # If we have a real IP, query API with that IP
         if client_ip:
+            # 1. Try ipapi.co
             try:
                 response = requests.get(f'https://ipapi.co/{client_ip}/json/', timeout=5)
                 if response.status_code == 200:
@@ -160,7 +161,27 @@ def get_location():
                             'timezone': data.get('timezone', '')
                         }), 200
             except Exception as e:
-                print(f"Erro ao buscar localização via API: {e}")
+                print(f"Erro ao buscar localização via ipapi.co: {e}")
+            
+            # 2. Fallback: Try ipwho.is
+            try:
+                print(f"📡 Tentando fallback com ipwho.is para IP {client_ip}...")
+                response = requests.get(f'https://ipwho.is/{client_ip}', timeout=5)
+                if response.status_code == 200:
+                    data = response.json()
+                    if data.get('success'):
+                        return jsonify({
+                            'ip': data.get('ip', client_ip),
+                            'city': data.get('city', ''),
+                            'region': data.get('region', ''),
+                            'country': data.get('country', ''),
+                            'country_code': data.get('country_code', ''),
+                            'latitude': data.get('latitude', ''),
+                            'longitude': data.get('longitude', ''),
+                            'timezone': data.get('timezone', {}).get('id', '')
+                        }), 200
+            except Exception as e:
+                print(f"Erro ao buscar localização via ipwho.is: {e}")
         
         # Final fallback
         return jsonify({
